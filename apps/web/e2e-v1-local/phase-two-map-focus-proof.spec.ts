@@ -1,10 +1,16 @@
 import { expect, test } from './phase-two-fixtures';
 
 import {
+  expectFocusCitationLabel,
+  expectFocusGapDescription,
+  expectProofVerificationState,
   expectRepositoryBindingName,
   fetchProjectRun,
+  focusWorkspaceLocator,
   openProjectRunWorkspace,
   prepareAuthenticatedTestPage,
+  proofFactsLocator,
+  repositoryBindingRegion,
   required,
   selectWorkspaceTab,
 } from './helpers';
@@ -66,18 +72,18 @@ test.describe('Phase 2 Wave A project run surfaces', () => {
     if (citationId) {
       const citation = projection.citations?.find((item) => item.id === citationId);
       expect(citation).toBeTruthy();
-      await expect(page.getByText(citation!.label)).toBeVisible();
+      await expectFocusCitationLabel(page, citation!.label);
     } else {
-      await expect(page.getByText('연결된 인용이 없습니다.')).toBeVisible();
+      await expect(focusWorkspaceLocator(page).getByText('연결된 인용이 없습니다.')).toBeVisible();
     }
 
     const gapId = anchorTask!.gapIds?.[0];
     if (gapId) {
       const gap = projection.gaps?.find((item) => item.id === gapId);
       expect(gap).toBeTruthy();
-      await expect(page.getByText(gap!.description)).toBeVisible();
+      await expectFocusGapDescription(page, gap!.description);
     } else {
-      await expect(page.getByText('연결된 갭이 없습니다.')).toBeVisible();
+      await expect(focusWorkspaceLocator(page).getByText('연결된 갭이 없습니다.')).toBeVisible();
     }
 
     if (anchorTask!.evidenceRequirements.length > 0) {
@@ -90,12 +96,14 @@ test.describe('Phase 2 Wave A project run surfaces', () => {
     await openProjectRunWorkspace(page, projectRunId);
     await selectWorkspaceTab(page, 'Proof');
 
-    await expect(page.getByLabel('저장소 바인딩')).toBeVisible();
+    await expect(repositoryBindingRegion(page)).toBeVisible();
 
     if (projection.repositoryBinding?.repositoryName) {
       await expectRepositoryBindingName(page, projection.repositoryBinding.repositoryName);
     } else {
-      await expect(page.getByText('바인딩 정보가 없습니다.')).toBeVisible();
+      await expect(
+        repositoryBindingRegion(page).getByText('바인딩 정보가 없습니다.'),
+      ).toBeVisible();
     }
 
     if (!projection.proof) {
@@ -103,28 +111,29 @@ test.describe('Phase 2 Wave A project run surfaces', () => {
       return;
     }
 
-    const verificationState = projection.proof.verification.state;
-    const verificationKo =
-      verificationState === 'PASS'
-        ? '검증 통과'
-        : verificationState === 'PENDING'
-          ? '검증 대기'
-          : verificationState === 'FAIL'
-            ? '검증 실패'
-            : '검증 만료';
-    await expect(page.getByText(verificationKo)).toBeVisible();
+    await expectProofVerificationState(page, projection.proof.verification.state);
 
     const failed = projection.proof.failedCriteria ?? [];
     const evaluations = projection.proof.facts?.evaluations ?? [];
     if (failed.length > 0) {
-      await expect(page.getByRole('heading', { name: '실패한 기준' })).toBeVisible();
-      await expect(page.getByText(failed[0]!.ruleId)).toBeVisible();
+      await expect(
+        proofFactsLocator(page).getByRole('heading', { name: '실패한 기준' }),
+      ).toBeVisible();
+      await expect(proofFactsLocator(page).getByText(failed[0]!.ruleId)).toBeVisible();
     } else if (evaluations.length > 0) {
-      await expect(page.getByRole('heading', { name: '규칙별 결과' })).toBeVisible();
+      await expect(
+        proofFactsLocator(page).getByRole('heading', { name: '규칙별 결과' }),
+      ).toBeVisible();
       const first = evaluations[0]!;
-      await expect(page.getByText(first.passed ? '통과' : '실패').first()).toBeVisible();
+      await expect(
+        proofFactsLocator(page)
+          .getByText(first.passed ? '통과' : '실패')
+          .first(),
+      ).toBeVisible();
     } else {
-      await expect(page.getByText('기계 검증 사실이 아직 없습니다.')).toBeVisible();
+      await expect(
+        proofFactsLocator(page).getByText('기계 검증 사실이 아직 없습니다.'),
+      ).toBeVisible();
     }
   });
 
@@ -145,6 +154,8 @@ test.describe('Phase 2 Wave A project run surfaces', () => {
 
     await selectWorkspaceTab(page, '포커스');
     await expect(page.getByRole('heading', { level: 2, name: anchorTask!.title })).toBeVisible();
-    await expect(page.getByText(anchorId!, { exact: true })).toBeVisible();
+    await expect(
+      focusWorkspaceLocator(page).locator('header').getByText(anchorId!, { exact: true }),
+    ).toBeVisible();
   });
 });

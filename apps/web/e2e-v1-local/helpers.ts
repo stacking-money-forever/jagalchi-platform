@@ -103,9 +103,12 @@ export async function selectWorkspaceTab(page: Page, label: '지도' | '포커�
   await expect(page.getByRole('tab', { name: label })).toHaveAttribute('aria-selected', 'true');
 }
 
+export function repositoryBindingRegion(page: Page) {
+  return page.getByRole('region', { name: '저장소 바인딩' });
+}
+
 export function repositoryBindingValueLocator(page: Page, repositoryName: string) {
-  return page
-    .getByRole('region', { name: '저장소 바인딩' })
+  return repositoryBindingRegion(page)
     .locator('dt', { hasText: '저장소' })
     .locator('xpath=following-sibling::dd[1]')
     .filter({ hasText: repositoryName });
@@ -113,6 +116,54 @@ export function repositoryBindingValueLocator(page: Page, repositoryName: string
 
 export async function expectRepositoryBindingName(page: Page, repositoryName: string) {
   await expect(repositoryBindingValueLocator(page, repositoryName)).toBeVisible();
+}
+
+export function focusWorkspaceLocator(page: Page) {
+  return page.locator('section[aria-label="포커스 작업"]');
+}
+
+export function proofFactsLocator(page: Page) {
+  return page.locator('section[aria-label="Proof 사실"]');
+}
+
+export async function expectFocusCitationLabel(page: Page, label: string) {
+  await expect(
+    focusWorkspaceLocator(page)
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: '인용된 채용 요구사항' }) })
+      .getByText(label, { exact: true }),
+  ).toBeVisible();
+}
+
+export async function expectFocusGapDescription(page: Page, description: string) {
+  await expect(
+    focusWorkspaceLocator(page)
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: '커리어 갭' }) })
+      .getByText(description, { exact: true }),
+  ).toBeVisible();
+}
+
+export function verificationStateLabelKo(state: 'PENDING' | 'PASS' | 'FAIL' | 'STALE'): string {
+  switch (state) {
+    case 'PASS':
+      return '검증 통과';
+    case 'PENDING':
+      return '검증 대기';
+    case 'FAIL':
+      return '검증 실패';
+    case 'STALE':
+      return '검증 만료';
+    default:
+      return state;
+  }
+}
+
+export async function expectProofVerificationState(
+  page: Page,
+  state: 'PENDING' | 'PASS' | 'FAIL' | 'STALE',
+) {
+  await expect(proofFactsLocator(page).getByText(verificationStateLabelKo(state))).toBeVisible();
 }
 
 export async function ensureSeedSession(page: Page): Promise<void> {
@@ -130,7 +181,7 @@ export async function openWaveBTargetEntry(page: Page) {
   await ensureSeedSession(page);
   await page.goto('/projects/new');
   await expectNoServiceWorker(page);
-  await expect(page.getByText('목표 공고 → 프로젝트 실행')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '목표 공고 → 프로젝트 실행' })).toBeVisible();
 }
 
 export async function completeWaveBWizardFromProfileReview(page: Page) {
