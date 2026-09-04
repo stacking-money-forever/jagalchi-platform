@@ -38,7 +38,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm start --hostname 127.0.0.1 --port 3100',
+    // Wave B `/projects/new` bakes feature flags at build time; start alone is not enough.
+    command: 'pnpm build && pnpm start --hostname 127.0.0.1 --port 3100',
     cwd: import.meta.dirname,
     env: {
       API_ORIGIN: 'http://127.0.0.1:8080',

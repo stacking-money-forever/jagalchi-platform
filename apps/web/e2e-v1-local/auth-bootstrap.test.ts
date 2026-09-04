@@ -32,6 +32,21 @@ describe('auth-bootstrap', () => {
     );
   });
 
+  it('reuses an entitled session when the API probe and UI cookie are both present', async () => {
+    const page = {
+      request: {
+        get: vi.fn().mockResolvedValue({ status: () => 200 }),
+      },
+      context: () => ({
+        cookies: vi.fn().mockResolvedValue([{ name: 'jagalchi-session', value: '1' }]),
+      }),
+    };
+
+    await authBootstrap.ensureSeedAuthSession(page as never);
+
+    expect(page.request.get).toHaveBeenCalledTimes(1);
+  });
+
   it('requests the entitled project run when probing the seed session', async () => {
     const page = {
       request: {

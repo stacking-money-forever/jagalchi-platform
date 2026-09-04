@@ -51,6 +51,39 @@ export function resetCsrfToken(): void {
   csrfTokenExpiresAt = 0;
 }
 
+/** Proxy-mode browser fetch that mirrors apiClient CSRF handling for createApiTransport callers. */
+export function createCsrfAwareFetch(fetchImplementation: typeof fetch = fetch): typeof fetch {
+  return async (input, init) => {
+    const method = (init?.method ?? 'GET').toUpperCase();
+    const credentials = init?.credentials ?? CREDENTIALS;
+
+    if (!IS_PROXY_MODE || SAFE_METHODS_SET.has(method)) {
+      return fetchImplementation(input, { ...init, credentials });
+    }
+
+    const attachCsrf = async (token: string | null) => {
+      const headers = new Headers(init?.headers);
+      if (token) headers.set('X-CSRF-Token', token);
+      return fetchImplementation(input, { ...init, credentials, headers });
+    };
+
+    let response = await attachCsrf(await getCsrfToken());
+
+    if (response.status === 403) {
+      const error = (await response
+        .clone()
+        .json()
+        .catch(() => undefined)) as { code?: unknown } | undefined;
+      if (error?.code === 'CSRF_TOKEN_INVALID') {
+        resetCsrfToken();
+        response = await attachCsrf(await getCsrfToken());
+      }
+    }
+
+    return response;
+  };
+}
+
 export const SESSION_COOKIE_KEY = 'jagalchi-session';
 
 interface ApiError {

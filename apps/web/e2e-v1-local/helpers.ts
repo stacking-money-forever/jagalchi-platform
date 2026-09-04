@@ -80,6 +80,7 @@ export async function fetchProjectRun(
   page: Page,
   projectRunId: string,
 ): Promise<ProjectRunProjectionPayload> {
+  await ensureSeedSession(page);
   const runResponse = await page.request.get(`/api/project-runs/${projectRunId}`);
   expect(runResponse.status()).toBe(200);
   const projection = (await runResponse.json()) as ProjectRunProjectionPayload;
@@ -88,6 +89,7 @@ export async function fetchProjectRun(
 }
 
 export async function openProjectRunWorkspace(page: Page, projectRunId: string) {
+  await ensureSeedSession(page);
   const pageResponse = await page.goto(`/projects/${projectRunId}`);
   expect(pageResponse?.status()).toBe(200);
   await expect(
@@ -103,8 +105,10 @@ export async function selectWorkspaceTab(page: Page, label: '지도' | '포커�
 
 export function repositoryBindingValueLocator(page: Page, repositoryName: string) {
   return page
-    .getByLabel('저장소 바인딩')
-    .getByRole('definition', { name: repositoryName, exact: true });
+    .getByRole('region', { name: '저장소 바인딩' })
+    .locator('dt', { hasText: '저장소' })
+    .locator('xpath=following-sibling::dd[1]')
+    .filter({ hasText: repositoryName });
 }
 
 export async function expectRepositoryBindingName(page: Page, repositoryName: string) {
@@ -117,11 +121,13 @@ export async function ensureSeedSession(page: Page): Promise<void> {
 }
 
 export async function prepareAuthenticatedTestPage(page: Page) {
+  await ensureSeedSession(page);
   await page.goto('/');
   await expectNoServiceWorker(page);
 }
 
 export async function openWaveBTargetEntry(page: Page) {
+  await ensureSeedSession(page);
   await page.goto('/projects/new');
   await expectNoServiceWorker(page);
   await expect(page.getByText('목표 공고 → 프로젝트 실행')).toBeVisible();

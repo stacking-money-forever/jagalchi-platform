@@ -21,6 +21,7 @@ export const test = base.extend<object, WorkerFixtures>({
 
       try {
         await ensureSeedAuthSession(bootstrapPage);
+        await bootstrapPage.context().storageState({ path: storagePath });
       } finally {
         await bootstrapPage.close();
       }

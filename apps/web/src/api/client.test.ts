@@ -275,4 +275,35 @@ describe('api client session ending', () => {
     expect(fetchMock.mock.calls[1]?.[1]?.headers).toMatchObject({ 'X-CSRF-Token': 'stale' });
     expect(fetchMock.mock.calls[3]?.[1]?.headers).toMatchObject({ 'X-CSRF-Token': 'current' });
   });
+
+  it('createCsrfAwareFetch attaches CSRF headers to mutating requests', async () => {
+    const fetchMock = vi.fn<typeof fetch>((input, _init) => {
+      const url = String(input);
+      if (url === '/api/csrf-token') {
+        return Promise.resolve(
+          new Response(JSON.stringify({ token: 'csrf-token' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ id: 'import-1' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = await import('./client');
+    const csrfFetch = client.createCsrfAwareFetch(fetchMock);
+    await csrfFetch('/api/career/target-imports', { method: 'POST', body: '{}' });
+
+    const mutationHeaders = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes('/career/target-imports'),
+    )?.[1]?.headers;
+    expect(mutationHeaders).toBeInstanceOf(Headers);
+    expect((mutationHeaders as Headers).get('X-CSRF-Token')).toBe('csrf-token');
+  });
 });
