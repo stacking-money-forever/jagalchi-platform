@@ -40,7 +40,7 @@ export const EditorSidebar = memo(function EditorSidebar({ roadmapId = '' }: Edi
 
   const collapseButton = (
     <button
-      className="border-border bg-card hover:bg-muted absolute top-2 -left-8 z-10 flex h-8 w-8 items-center justify-center rounded-l-lg border border-r-0 shadow-sm transition-colors"
+      className="border-border bg-card hover:bg-muted absolute top-40 -left-8 z-10 flex h-8 w-8 items-center justify-center rounded-l-lg border border-r-0 shadow-sm transition-colors sm:top-2"
       onClick={() => setIsCollapsed((prev) => !prev)}
       aria-label={
         isCollapsed ? EDITOR_MESSAGES.SIDEBAR_OPEN_ARIA : EDITOR_MESSAGES.SIDEBAR_CLOSE_ARIA
