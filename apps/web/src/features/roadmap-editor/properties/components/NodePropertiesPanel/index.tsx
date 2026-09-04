@@ -222,8 +222,8 @@ export const NodePropertiesPanel = memo(function NodePropertiesPanel({
             <div className="flex items-center gap-2">
               <div className="bg-muted h-1.5 flex-1 rounded-full">
                 <div
-                  className="bg-primary h-full rounded-full transition-[width]"
-                  style={{ width: `${attachmentUploadProgress}%` }}
+                  className="bg-primary h-full w-full origin-left rounded-full transition-transform"
+                  style={{ transform: `scaleX(${attachmentUploadProgress / 100})` }}
                 />
               </div>
               <span className="text-muted-foreground w-9 text-right text-xs">

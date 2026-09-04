@@ -39,7 +39,7 @@ export const ColorPresetButton = forwardRef<HTMLButtonElement, ColorPresetButton
           'border-border border',
           'shadow-sm',
           // 인터랙션
-          'transition-all duration-200',
+          'transition-[color,background-color,border-color,box-shadow,transform] duration-200',
           'hover:scale-105 hover:shadow-md',
           'focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:outline-none',
           'active:scale-95',

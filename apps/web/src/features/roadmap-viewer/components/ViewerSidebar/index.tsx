@@ -109,8 +109,8 @@ export function ViewerSidebar({ isOpen = true, onClose, roadmapId }: ViewerSideb
           </div>
           <div className="bg-muted mt-1.5 h-2 rounded-full">
             <div
-              className="bg-primary h-full rounded-full transition-all"
-              style={{ width: `${progressPercent}%` }}
+              className="bg-primary h-full w-full origin-left rounded-full transition-transform"
+              style={{ transform: `scaleX(${progressPercent / 100})` }}
             />
           </div>
         </div>

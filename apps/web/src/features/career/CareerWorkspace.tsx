@@ -489,8 +489,10 @@ function CareerWorkspaceContent({ proofProfileEnabled }: { proofProfileEnabled: 
                   </div>
                   <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/20">
                     <div
-                      className="h-full rounded-full bg-white transition-[width]"
-                      style={{ width: `${diffQuery.data.summary.verifiedPercentage}%` }}
+                      className="h-full w-full origin-left rounded-full bg-white transition-transform"
+                      style={{
+                        transform: `scaleX(${diffQuery.data.summary.verifiedPercentage / 100})`,
+                      }}
                     />
                   </div>
                 </article>
