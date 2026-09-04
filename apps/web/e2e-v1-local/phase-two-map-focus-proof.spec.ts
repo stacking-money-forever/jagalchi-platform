@@ -111,7 +111,10 @@ test.describe('Phase 2 Wave A project run surfaces', () => {
       return;
     }
 
-    await expectProofVerificationState(page, projection.proof.verification.state);
+    await expectProofVerificationState(
+      page,
+      projection.proof.verification.state as 'PENDING' | 'PASS' | 'FAIL' | 'STALE',
+    );
 
     const failed = projection.proof.failedCriteria ?? [];
     const evaluations = projection.proof.facts?.evaluations ?? [];
