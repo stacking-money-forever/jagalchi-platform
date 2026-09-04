@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { reuseSeedAuthSession } from './auth-bootstrap';
+import { persistWorkerSeedAuthStorage } from './phase-two-fixtures';
 
 function createHealthySeedAuthPage() {
   const cookies = vi.fn().mockResolvedValue([{ name: 'jagalchi-session', value: '1' }]);
@@ -103,5 +104,14 @@ describe('phase-two fixture auth contract', () => {
     expect(resultB.sessionMutated).toBe(false);
     expect(pageB.request.patch).not.toHaveBeenCalled();
     expect(persistCalls).toEqual([1]);
+  });
+
+  it('writes the latest cookie jar back to the worker storage path after each context', async () => {
+    const storageState = vi.fn().mockResolvedValue(undefined);
+    const storagePath = '/tmp/seed-user.json';
+
+    await persistWorkerSeedAuthStorage({ storageState }, storagePath);
+
+    expect(storageState).toHaveBeenCalledWith({ path: storagePath });
   });
 });
