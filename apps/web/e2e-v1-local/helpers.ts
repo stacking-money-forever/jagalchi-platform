@@ -235,6 +235,23 @@ export async function openWaveBTargetEntry(page: Page) {
   await expect(page.getByRole('heading', { name: '목표 공고 → 프로젝트 실행' })).toBeVisible();
 }
 
+export const WAVE_B_FIXTURE_REPOSITORY_LABEL = 'fixture/verification-repository';
+
+export async function selectWaveBExistingRepository(
+  page: Page,
+  repositoryLabel = WAVE_B_FIXTURE_REPOSITORY_LABEL,
+) {
+  await expect(page.getByRole('heading', { name: '저장소 연결' })).toBeVisible();
+  const repoSelect = page.getByLabel('GitHub 저장소');
+  await expect(repoSelect).toBeVisible();
+  await expect(repoSelect.locator('option', { hasText: repositoryLabel })).toHaveCount(1);
+  await repoSelect.selectOption({ label: repositoryLabel });
+
+  const continueButton = page.getByRole('button', { name: '범위 확인으로 계속' });
+  await expect(continueButton).toBeEnabled();
+  await continueButton.click();
+}
+
 export async function completeWaveBWizardFromProfileReview(page: Page) {
   await expect(page.getByRole('heading', { name: 'GitHub 증거 스냅샷 검토' })).toBeVisible({
     timeout: 180_000,
@@ -252,15 +269,9 @@ export async function completeWaveBWizardFromProfileReview(page: Page) {
   await page.getByRole('button', { name: '이 제안 선택' }).first().click();
   await page.getByRole('button', { name: '저장소 연결로 계속' }).click();
 
-  const repoSelect = page.locator('select').first();
-  if (await repoSelect.isVisible()) {
-    const options = repoSelect.locator('option');
-    const optionCount = await options.count();
-    expect(optionCount).toBeGreaterThan(1);
-    await repoSelect.selectOption({ index: 1 });
-  }
+  await selectWaveBExistingRepository(page);
 
-  await page.getByRole('button', { name: '범위 확인으로 계속' }).click();
+  await expect(page.getByRole('heading', { name: '범위 및 비목표 확인' })).toBeVisible();
   await page.getByRole('button', { name: '프로젝트 실행 만들기' }).click();
 
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/i, { timeout: 180_000 });
