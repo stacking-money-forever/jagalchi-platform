@@ -1,3 +1,4 @@
+import type { ProjectRunProjectionEnvelope } from './projection-contract';
 import type {
   RoadmapGraphModel,
   RoadmapMilestone,
@@ -5,9 +6,12 @@ import type {
   RoadmapTask,
   TaskState,
 } from './types';
-import type { ProjectRunProjection } from '@jagalchi/api-client';
 
-function deriveMilestones(projection: ProjectRunProjection): RoadmapMilestone[] {
+function deriveMilestones(projection: ProjectRunProjectionEnvelope): RoadmapMilestone[] {
+  if (projection.milestones?.length) {
+    return projection.milestones.map((m) => ({ id: m.id, title: m.title }));
+  }
+
   const seen = new Set<string>();
   const milestones: RoadmapMilestone[] = [];
   let index = 0;
@@ -32,7 +36,7 @@ function deriveMilestones(projection: ProjectRunProjection): RoadmapMilestone[] 
 
 function citationLabelsForTask(
   citationIds: readonly string[] | undefined,
-  projection: ProjectRunProjection,
+  projection: ProjectRunProjectionEnvelope,
 ): string[] {
   if (!citationIds?.length || !projection.citations?.length) return [];
   const byId = new Map(projection.citations.map((c) => [c.id, c.label]));
@@ -41,7 +45,7 @@ function citationLabelsForTask(
 
 function gapLabelsForTask(
   gapIds: readonly string[] | undefined,
-  projection: ProjectRunProjection,
+  projection: ProjectRunProjectionEnvelope,
 ): string[] {
   if (!gapIds?.length || !projection.gaps?.length) return [];
   const byId = new Map(projection.gaps.map((g) => [g.id, g.description]));
@@ -49,8 +53,8 @@ function gapLabelsForTask(
 }
 
 function evidenceCountForTask(
-  task: ProjectRunProjection['tasks'][number],
-  projection: ProjectRunProjection,
+  task: ProjectRunProjectionEnvelope['tasks'][number],
+  projection: ProjectRunProjectionEnvelope,
 ): number {
   const evaluations = projection.proof?.facts?.evaluations ?? [];
   if (evaluations.length === 0) return 0;
@@ -59,8 +63,8 @@ function evidenceCountForTask(
 }
 
 function adaptTask(
-  task: ProjectRunProjection['tasks'][number],
-  projection: ProjectRunProjection,
+  task: ProjectRunProjectionEnvelope['tasks'][number],
+  projection: ProjectRunProjectionEnvelope,
 ): RoadmapTask | null {
   if (!task.milestoneId) return null;
   const blockedReason =
@@ -84,7 +88,7 @@ function adaptTask(
   };
 }
 
-function adaptProof(projection: ProjectRunProjection): RoadmapProofState | null {
+function adaptProof(projection: ProjectRunProjectionEnvelope): RoadmapProofState | null {
   if (!projection.proof) return null;
   return {
     verification: projection.proof.verification.state,
@@ -92,7 +96,14 @@ function adaptProof(projection: ProjectRunProjection): RoadmapProofState | null 
   };
 }
 
-export function adaptProjectRunProjection(projection: ProjectRunProjection): RoadmapGraphModel {
+/**
+ * Maps API projection into the read-only roadmap graph model.
+ * Uses projection.recommendedTaskId as the authoritative next-task source (G2).
+ * Joins citations/gaps by task id arrays only — no plan snapshot fetch.
+ */
+export function adaptProjectRunProjection(
+  projection: ProjectRunProjectionEnvelope,
+): RoadmapGraphModel {
   const milestones = deriveMilestones(projection);
   const tasks = projection.tasks
     .map((task) => adaptTask(task, projection))

@@ -16,41 +16,32 @@ function model(partial: Partial<RoadmapGraphModel>): RoadmapGraphModel {
   };
 }
 
+const taskBase = {
+  required: true,
+  milestoneId: 'm1',
+  purpose: '',
+  acceptanceCriteria: [],
+  evidenceRequirements: [],
+  evidenceCount: 0,
+  outcome: '',
+  citationLabels: [],
+  gapLabels: [],
+};
+
 describe('deriveCurrentPath', () => {
   it('uses currentTaskId as anchor and includes ancestors', () => {
     const path = deriveCurrentPath(
       model({
         currentTaskId: 't2',
+        recommendedTaskId: 'rec-1',
         tasks: [
-          {
-            id: 't1',
-            title: '1',
-            state: 'DONE',
-            required: true,
-            milestoneId: 'm1',
-            prerequisiteIds: [],
-            purpose: '',
-            acceptanceCriteria: [],
-            evidenceRequirements: [],
-            evidenceCount: 0,
-            outcome: '',
-            citationLabels: [],
-            gapLabels: [],
-          },
+          { id: 't1', title: '1', state: 'DONE', prerequisiteIds: [], ...taskBase },
           {
             id: 't2',
             title: '2',
             state: 'IN_PROGRESS',
-            required: true,
-            milestoneId: 'm1',
             prerequisiteIds: ['t1'],
-            purpose: '',
-            acceptanceCriteria: [],
-            evidenceRequirements: [],
-            evidenceCount: 0,
-            outcome: '',
-            citationLabels: [],
-            gapLabels: [],
+            ...taskBase,
           },
         ],
       }),
@@ -58,29 +49,13 @@ describe('deriveCurrentPath', () => {
     expect(path).toEqual(expect.arrayContaining(['t1', 't2']));
   });
 
-  it('falls back to recommendedTaskId when current is null', () => {
+  it('falls back to recommendedTaskId when current is null (G2 UI source)', () => {
     const path = deriveCurrentPath(
       model({
-        recommendedTaskId: 't1',
-        tasks: [
-          {
-            id: 't1',
-            title: '1',
-            state: 'READY',
-            required: true,
-            milestoneId: 'm1',
-            prerequisiteIds: [],
-            purpose: '',
-            acceptanceCriteria: [],
-            evidenceRequirements: [],
-            evidenceCount: 0,
-            outcome: '',
-            citationLabels: [],
-            gapLabels: [],
-          },
-        ],
+        recommendedTaskId: 'rec-1',
+        tasks: [{ id: 'rec-1', title: '1', state: 'READY', prerequisiteIds: [], ...taskBase }],
       }),
     );
-    expect(path).toEqual(['t1']);
+    expect(path).toEqual(['rec-1']);
   });
 });

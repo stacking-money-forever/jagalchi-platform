@@ -3,13 +3,14 @@ import { describe, expect, it } from 'vitest';
 import type { ProjectRunProjection } from '@jagalchi/api-client';
 
 import { adaptProjectRunProjection } from './adapt-projection';
+import type { ProjectRunProjectionEnvelope } from './projection-contract';
 
 const baseRun = {
   id: 'run-1',
   state: 'ACTIVE',
   version: 2,
   currentTaskId: 't2',
-  recommendedTaskId: 't2',
+  recommendedTaskId: 'rec-1',
   plan: { id: 'plan-1', schemaVersion: 1 },
   map: {
     nodes: [
@@ -74,5 +75,15 @@ describe('adaptProjectRunProjection', () => {
     expect(model.tasks[1]?.blockedReason).toBe('missing path');
     expect(model.tasks[1]?.evidenceCount).toBe(1);
     expect(model.proof?.verification).toBe('PENDING');
+    expect(model.recommendedTaskId).toBe('rec-1');
+  });
+
+  it('uses projection.milestones titles when BE provides them (G4)', () => {
+    const withTitles: ProjectRunProjectionEnvelope = {
+      ...baseRun,
+      milestones: [{ id: 'm1', title: '인증 기반 구축' }],
+    };
+    const model = adaptProjectRunProjection(withTitles);
+    expect(model.milestones).toEqual([{ id: 'm1', title: '인증 기반 구축' }]);
   });
 });

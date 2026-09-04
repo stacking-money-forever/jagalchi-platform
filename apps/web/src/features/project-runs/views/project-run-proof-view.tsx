@@ -6,13 +6,23 @@ import { Button } from '@/components/ui/button';
 import { useProjectRunCommands } from '../hooks/use-project-run-commands';
 import { publicationLabelKo, verificationLabelKo } from '../projection';
 
-import type { ProjectRunProjection } from '@jagalchi/api-client';
+import type { ProjectRunProjectionEnvelope } from '../projection/projection-contract';
 
-export function ProjectRunProofView({ run }: { run: ProjectRunProjection }) {
+export function ProjectRunProofView({ run }: { run: ProjectRunProjectionEnvelope }) {
   const commands = useProjectRunCommands(run);
   const proof = run.proof;
   const binding = run.repositoryBinding;
   const facts = proof?.facts;
+  const failedCriteria =
+    proof?.failedCriteria ??
+    facts?.evaluations
+      ?.filter((e) => !e.passed)
+      .map((e) => ({
+        ruleId: e.ruleId,
+        type: e.type,
+        code: e.code,
+      })) ??
+    [];
 
   if (!proof) {
     return <p className="text-muted-foreground text-sm">Proof 데이터가 아직 없습니다.</p>;
@@ -20,6 +30,17 @@ export function ProjectRunProofView({ run }: { run: ProjectRunProjection }) {
 
   return (
     <div className="space-y-6">
+      {run.pendingOperation ? (
+        <section
+          className="border-border bg-muted/40 rounded-xl border p-4"
+          aria-label="진행 중인 작업"
+        >
+          <p className="text-sm font-bold">검증 작업 진행 중</p>
+          <p className="text-muted-foreground mt-1 font-mono text-xs">{run.pendingOperation.id}</p>
+          <p className="text-muted-foreground mt-1 text-xs">종류: {run.pendingOperation.kind}</p>
+        </section>
+      ) : null}
+
       <section aria-label="저장소 바인딩" className="border-border rounded-xl border p-4">
         <h2 className="text-sm font-bold">저장소 바인딩</h2>
         {binding ? (
@@ -69,6 +90,11 @@ export function ProjectRunProofView({ run }: { run: ProjectRunProjection }) {
           {proof.validUntil ? (
             <span className="text-muted-foreground text-xs">유효 기한 {proof.validUntil}</span>
           ) : null}
+          {proof.publication.supersededSnapshotId ? (
+            <span className="text-muted-foreground text-xs">
+              대체된 스냅샷 {proof.publication.supersededSnapshotId}
+            </span>
+          ) : null}
         </div>
 
         {facts ? (
@@ -117,9 +143,34 @@ export function ProjectRunProofView({ run }: { run: ProjectRunProjection }) {
           <p className="text-muted-foreground mt-2 text-sm">기계 검증 사실이 아직 없습니다.</p>
         )}
 
+        {failedCriteria.length > 0 ? (
+          <div className="mt-4 overflow-x-auto">
+            <h3 className="text-sm font-bold">실패한 기준</h3>
+            <table className="mt-2 w-full text-left text-xs">
+              <thead>
+                <tr className="border-border border-b">
+                  <th className="p-2 font-bold">규칙</th>
+                  <th className="p-2 font-bold">유형</th>
+                  <th className="p-2 font-bold">코드</th>
+                </tr>
+              </thead>
+              <tbody>
+                {failedCriteria.map((ev) => (
+                  <tr key={ev.ruleId} className="border-border border-b">
+                    <td className="p-2 font-mono">{ev.ruleId}</td>
+                    <td className="p-2">{ev.type}</td>
+                    <td className="p-2 font-mono">{ev.code}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+
         {facts?.evaluations?.length ? (
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <h3 className="text-sm font-bold">규칙별 결과</h3>
+            <table className="mt-2 w-full text-left text-xs">
               <thead>
                 <tr className="border-border border-b">
                   <th className="p-2 font-bold">규칙</th>
@@ -161,7 +212,7 @@ export function ProjectRunProofView({ run }: { run: ProjectRunProjection }) {
           <Button
             size="sm"
             variant="outline"
-            disabled={commands.reverify.isPending}
+            disabled={commands.reverify.isPending || Boolean(run.pendingOperation)}
             onClick={() => commands.reverify.mutate()}
           >
             재검증
