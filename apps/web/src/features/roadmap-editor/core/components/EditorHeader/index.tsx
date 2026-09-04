@@ -35,31 +35,31 @@ export const EditorHeader = memo(function EditorHeader({
   };
 
   return (
-    <header className="border-border bg-card text-foreground absolute top-3 left-3 z-10 flex max-w-[calc(100vw-1.5rem)] flex-col gap-2 rounded-lg border p-2 shadow-md sm:top-4 sm:left-4">
-      <div className="flex items-center gap-2">
+    <header className="border-border bg-card text-foreground absolute top-3 left-3 z-10 flex w-[calc(100vw-1.5rem)] max-w-[calc(100vw-1.5rem)] flex-col gap-2 rounded-lg border p-2 shadow-md sm:top-4 sm:left-4 sm:w-auto">
+      <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
         <Button
           type="button"
           intent="neutral"
           variant="ghost"
           size="xs"
-          className="min-h-8 min-w-8 rounded-lg p-[7px]"
+          className="min-h-8 min-w-8 shrink-0 rounded-lg p-[7px]"
           onClick={handleBackClick}
           aria-label="뒤로가기"
         >
           <ChevronLeft className="h-[15px] w-[15px]" />
         </Button>
 
-        <span className="text-foreground text-base leading-6 font-semibold whitespace-nowrap">
+        <span className="text-foreground min-w-0 flex-1 truncate text-base leading-6 font-semibold">
           {title || '새 실행 과제'}
         </span>
 
-        <span className="text-muted-foreground text-xs leading-4 font-medium tracking-[0.18px]">
+        <span className="text-muted-foreground hidden shrink-0 text-xs leading-4 font-medium tracking-[0.18px] sm:inline">
           편집 중
         </span>
 
         {isConnected !== undefined && (
           <span
-            className="flex items-center gap-1 text-xs leading-4 font-medium"
+            className="flex shrink-0 items-center gap-1 text-xs leading-4 font-medium"
             aria-label={
               isConnected
                 ? REALTIME_MESSAGES.CONNECTION_CONNECTED
@@ -71,7 +71,13 @@ export const EditorHeader = memo(function EditorHeader({
                 isConnected ? 'bg-success' : 'bg-muted-foreground'
               }`}
             />
-            <span className={isConnected ? 'text-success' : 'text-muted-foreground'}>
+            <span
+              className={
+                isConnected
+                  ? 'text-success hidden sm:inline'
+                  : 'text-muted-foreground hidden sm:inline'
+              }
+            >
               {isConnected
                 ? REALTIME_MESSAGES.CONNECTION_CONNECTED
                 : REALTIME_MESSAGES.CONNECTION_DISCONNECTED}
@@ -85,7 +91,7 @@ export const EditorHeader = memo(function EditorHeader({
             intent="neutral"
             variant="ghost"
             size="xs"
-            className="flex min-h-8 min-w-8 items-center justify-center rounded-lg p-[7px]"
+            className="flex min-h-8 min-w-8 shrink-0 items-center justify-center rounded-lg p-[7px]"
             onClick={() => router.push(`/viewer/${roadmapId}`)}
             aria-label="뷰어 미리보기"
           >
