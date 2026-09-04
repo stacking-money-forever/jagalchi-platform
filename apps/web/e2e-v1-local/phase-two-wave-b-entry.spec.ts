@@ -1,22 +1,15 @@
 import { expect, test } from './phase-two-fixtures';
 
-import { FIXTURE_MANUAL_CAPTURE_SOURCE_TEXT } from '@jagalchi/api-client';
+import { FIXTURE_JOB_POSTING_URL, FIXTURE_MANUAL_CAPTURE_SOURCE_TEXT } from '@jagalchi/api-client';
 
-import {
-  completeWaveBWizardFromProfileReview,
-  openWaveBTargetEntry,
-  prepareAuthenticatedTestPage,
-} from './helpers';
+import { completeWaveBWizardFromProfileReview, openWaveBTargetEntry } from './helpers';
 
 test.describe('Phase 2 Wave B target entry', () => {
-  test.beforeEach(async ({ page }) => {
-    await prepareAuthenticatedTestPage(page);
-  });
-
   test('fixture intake can reach project run map', async ({ page }) => {
     test.setTimeout(300_000);
 
     await openWaveBTargetEntry(page);
+    await expect(page.getByRole('textbox').first()).toHaveValue(FIXTURE_JOB_POSTING_URL);
     await page.getByRole('button', { name: '공고 가져오기' }).click();
     await completeWaveBWizardFromProfileReview(page);
   });

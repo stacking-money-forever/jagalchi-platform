@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import * as authBootstrap from './auth-bootstrap';
 import {
+  SEED_AUTH_REUSE_ERROR,
   SEED_LOGIN_RATE_LIMIT_ERROR,
   SEED_SESSION_RATE_LIMIT_ERROR,
   assertProbeNotRateLimited,
+  ensureSeedAuthSession,
+  probeEntitledSeedSession,
+  reuseSeedAuthSession,
 } from './auth-bootstrap';
 
 describe('auth-bootstrap', () => {
@@ -27,16 +30,52 @@ describe('auth-bootstrap', () => {
       },
     };
 
-    await expect(authBootstrap.ensureSeedAuthSession(page as never)).rejects.toThrow(
+    await expect(ensureSeedAuthSession(page as never)).rejects.toThrow(
       SEED_SESSION_RATE_LIMIT_ERROR,
     );
+  });
+
+  it('reuses worker auth without attempting login when the entitled probe succeeds', async () => {
+    const page = {
+      request: {
+        get: vi
+          .fn()
+          .mockResolvedValueOnce({ status: () => 200, ok: () => true })
+          .mockResolvedValueOnce({
+            status: () => 200,
+            ok: () => true,
+            json: async () => ({ token: 'csrf' }),
+          })
+          .mockResolvedValueOnce({ status: () => 200, ok: () => true }),
+      },
+      goto: vi.fn().mockResolvedValue(undefined),
+      context: () => ({
+        cookies: vi.fn().mockResolvedValue([{ name: 'jagalchi-session', value: '1' }]),
+      }),
+    };
+
+    await reuseSeedAuthSession(page as never);
+
+    expect(page.request.get).toHaveBeenCalledTimes(1);
+    expect(page.goto).not.toHaveBeenCalled();
+  });
+
+  it('refuses to log in when worker auth is missing during reuse', async () => {
+    const page = {
+      request: {
+        get: vi.fn().mockResolvedValue({ status: () => 401, ok: () => false }),
+      },
+    };
+
+    await expect(reuseSeedAuthSession(page as never)).rejects.toThrow(SEED_AUTH_REUSE_ERROR);
   });
 
   it('hydrates the UI session hint when the API probe succeeds without a cookie', async () => {
     let cookieChecks = 0;
     const page = {
       request: {
-        get: vi.fn().mockResolvedValue({ status: () => 200 }),
+        get: vi.fn().mockResolvedValue({ status: () => 200, ok: () => true }),
+        patch: vi.fn(),
       },
       goto: vi.fn().mockResolvedValue(undefined),
       context: () => ({
@@ -47,10 +86,9 @@ describe('auth-bootstrap', () => {
       }),
     };
 
-    await authBootstrap.ensureSeedAuthSession(page as never);
+    await ensureSeedAuthSession(page as never);
 
-    expect(page.goto).toHaveBeenCalledWith('/');
-    expect(page.request.get).toHaveBeenCalledTimes(1);
+    expect(page.request.patch).not.toHaveBeenCalled();
     expect(cookieChecks).toBeGreaterThanOrEqual(2);
   });
 
@@ -64,7 +102,7 @@ describe('auth-bootstrap', () => {
       }),
     };
 
-    await authBootstrap.ensureSeedAuthSession(page as never);
+    await ensureSeedAuthSession(page as never);
 
     expect(page.request.get).toHaveBeenCalledTimes(1);
   });
@@ -76,7 +114,7 @@ describe('auth-bootstrap', () => {
       },
     };
 
-    await authBootstrap.probeEntitledSeedSession(page as never);
+    await probeEntitledSeedSession(page as never);
     expect(page.request.get).toHaveBeenCalledWith(
       '/api/project-runs/22222222-2222-4222-8222-222222222222',
     );

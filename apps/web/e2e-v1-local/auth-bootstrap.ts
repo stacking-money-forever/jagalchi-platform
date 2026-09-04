@@ -27,9 +27,68 @@ async function hasUiSessionCookie(page: Page): Promise<boolean> {
   return cookies.some((cookie) => cookie.name === SESSION_COOKIE_KEY && cookie.value === '1');
 }
 
+async function refreshSessionHint(page: Page): Promise<boolean> {
+  const csrfResponse = await page.request.get('/api/csrf-token');
+  if (!csrfResponse.ok()) {
+    return false;
+  }
+
+  const { token } = (await csrfResponse.json()) as { token?: string };
+  if (!token) {
+    return false;
+  }
+
+  const refreshResponse = await page.request.patch('/api/users/auth/refresh', {
+    headers: {
+      'content-type': 'application/json',
+      'x-csrf-token': token,
+    },
+  });
+  assertProbeNotRateLimited(refreshResponse.status());
+  return refreshResponse.ok() && (await hasUiSessionCookie(page));
+}
+
 export async function hydrateUiSession(page: Page): Promise<void> {
+  if (await hasUiSessionCookie(page)) {
+    return;
+  }
+
+  if (await refreshSessionHint(page)) {
+    return;
+  }
+
   await page.goto('/');
+  if (await hasUiSessionCookie(page)) {
+    return;
+  }
+
+  if (await refreshSessionHint(page)) {
+    return;
+  }
+
   await expect.poll(async () => hasUiSessionCookie(page), { timeout: 10_000 }).toBe(true);
+}
+
+export const SEED_AUTH_REUSE_ERROR =
+  'seed auth must be established by setup-seed-auth or the worker fixture before tests run';
+
+export async function reuseSeedAuthSession(page: Page): Promise<void> {
+  const projectRunId = required('E2E_SEED_PROJECT_RUN_ID');
+  const sessionProbe = await probeEntitledSeedSession(page, projectRunId);
+  assertProbeNotRateLimited(sessionProbe.status());
+
+  if (sessionProbe.status() !== 200) {
+    throw new Error(SEED_AUTH_REUSE_ERROR);
+  }
+
+  if (!(await hasUiSessionCookie(page))) {
+    await hydrateUiSession(page);
+  }
+
+  expect(
+    await hasUiSessionCookie(page),
+    'seed session hint cookie must be present when reusing worker auth',
+  ).toBe(true);
 }
 
 export async function ensureSeedAuthSession(page: Page): Promise<void> {
@@ -37,11 +96,16 @@ export async function ensureSeedAuthSession(page: Page): Promise<void> {
   let sessionProbe = await probeEntitledSeedSession(page, projectRunId);
   assertProbeNotRateLimited(sessionProbe.status());
 
-  if (sessionProbe.status() === 200 && !(await hasUiSessionCookie(page))) {
-    await hydrateUiSession(page);
+  if (sessionProbe.status() === 200) {
+    if (!(await hasUiSessionCookie(page))) {
+      await hydrateUiSession(page);
+    }
     if (await hasUiSessionCookie(page)) {
       return;
     }
+    throw new Error(
+      'seed API session is entitled but jagalchi-session hint cookie could not be hydrated',
+    );
   }
 
   const needsLogin = sessionProbe.status() !== 200 || !(await hasUiSessionCookie(page));

@@ -288,18 +288,25 @@ export function TargetEntryWizard() {
 
   const buildTargetImport = useCallback((): import('@jagalchi/api-client').TargetImportDto => {
     if (showManualCapture && manualText.trim().length > 0) {
+      const originalUrl = jobUrl.trim();
       return {
         input: {
           kind: 'MANUAL_CAPTURE',
-          originalUrl: jobUrl.trim() || undefined,
+          ...(originalUrl ? { originalUrl } : {}),
           sourceText: manualText.trim(),
         },
       };
     }
+
+    const url = jobUrl.trim();
+    if (!url) {
+      throw new Error('JOB_URL_REQUIRED');
+    }
+
     return {
       input: {
         kind: 'FETCHED_URL',
-        url: jobUrl.trim(),
+        url,
       },
     };
   }, [jobUrl, manualText, showManualCapture]);

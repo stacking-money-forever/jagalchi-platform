@@ -218,8 +218,8 @@ export async function expectProofWorkspaceReady(
 }
 
 export async function ensureSeedSession(page: Page): Promise<void> {
-  const { ensureSeedAuthSession } = await import('./auth-bootstrap');
-  await ensureSeedAuthSession(page);
+  const { reuseSeedAuthSession } = await import('./auth-bootstrap');
+  await reuseSeedAuthSession(page);
 }
 
 export async function prepareAuthenticatedTestPage(page: Page) {
