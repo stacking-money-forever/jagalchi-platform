@@ -440,6 +440,7 @@ export function RoadmapMapCanvas({
     const nodes = graph.nodes.map((n) => ({
       ...n,
       draggable: false,
+      className: 'nodrag',
       selectable: n.type === 'task' || n.type === 'milestone',
       data: {
         ...n.data,

@@ -40,9 +40,8 @@ test.describe('Phase 2 Wave B target entry', () => {
     if (await repoSelect.isVisible()) {
       const options = repoSelect.locator('option');
       const optionCount = await options.count();
-      if (optionCount > 1) {
-        await repoSelect.selectOption({ index: 1 });
-      }
+      expect(optionCount).toBeGreaterThan(1);
+      await repoSelect.selectOption({ index: 1 });
     }
 
     await page.getByRole('button', { name: '범위 확인으로 계속' }).click();

@@ -447,6 +447,7 @@ export function TargetEntryWizard() {
 
   const createProjectRun = useCallback(async () => {
     if (!selectedProposalId || !profileSnapshot || !diffSnapshot || !repositoryBinding) return;
+    if (!isRepositoryBindingComplete(repositoryBinding.mode, repositoryBinding)) return;
     await runOperation(
       () =>
         createProjectRunOperation(

@@ -92,6 +92,8 @@ test.describe('Phase 2 Wave A project run surfaces', () => {
     await openProjectRunWorkspace(page, projectRunId);
     await selectWorkspaceTab(page, 'Proof');
 
+    await expect(page.getByLabel('저장소 바인딩')).toBeVisible();
+
     if (projection.repositoryBinding?.repositoryName) {
       await expect(page.getByText(projection.repositoryBinding.repositoryName)).toBeVisible();
     } else {
