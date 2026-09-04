@@ -13,9 +13,8 @@ import ProjectRunScreen from './[runId]';
 
 describe('ProjectRunScreen', () => {
   it('renders the canonical projection after an authenticated native request', async () => {
-    globalThis.fetch = jest.fn(async () => ({
-      ok: true,
-      json: async () => ({
+    globalThis.fetch = jest.fn(async () =>
+      Response.json({
         id: 'run-1',
         state: 'ACTIVE',
         version: 1,
@@ -33,7 +32,7 @@ describe('ProjectRunScreen', () => {
         }],
         proof: null,
       }),
-    })) as jest.Mock;
+    ) as jest.Mock;
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = render(
       <QueryClientProvider client={queryClient}>
