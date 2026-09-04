@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { reuseSeedAuthSession } from './auth-bootstrap';
 import {
@@ -36,18 +36,32 @@ function createHealthySeedAuthPage() {
 
 function createStaleStorageSeedAuthPage(generation: number) {
   let probeCalls = 0;
-  const cookies = vi.fn().mockResolvedValue([{ name: 'jagalchi-session', value: '1' }]);
+  let hasSessionHint = false;
+  const cookies = vi
+    .fn()
+    .mockImplementation(async () =>
+      hasSessionHint ? [{ name: 'jagalchi-session', value: '1' }] : [],
+    );
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      json: async () => ({ token: 'csrf-token' }),
+    })
+    .mockImplementation(async (url: string) => {
+      if (url !== '/api/users/auth/refresh') {
+        throw new Error(`unexpected browser fetch: ${url}`);
+      }
+      hasSessionHint = true;
+      return { status: 200, ok: true };
+    });
+  vi.stubGlobal('fetch', fetchMock);
+
   return {
     generation,
     request: {
       get: vi.fn().mockImplementation(async (url: string) => {
-        if (url.includes('csrf-token')) {
-          return {
-            status: () => 200,
-            ok: () => true,
-            json: async () => ({ token: 'csrf' }),
-          };
-        }
         if (url.includes('/api/project-runs/')) {
           probeCalls += 1;
           return probeCalls === 1 && generation > 0
@@ -56,13 +70,16 @@ function createStaleStorageSeedAuthPage(generation: number) {
         }
         return { status: () => 404, ok: () => false };
       }),
-      patch: vi.fn().mockResolvedValue({ status: () => 200, ok: () => true }),
+      patch: vi.fn(),
     },
+    url: vi.fn().mockReturnValue('http://127.0.0.1:3100/'),
     goto: vi.fn().mockResolvedValue(undefined),
+    evaluate: vi.fn(async (callback: () => Promise<unknown>) => callback()),
     context: () => ({
       cookies,
       storageState: vi.fn().mockResolvedValue(undefined),
     }),
+    fetchMock,
   };
 }
 
@@ -103,6 +120,10 @@ describe('phase-two fixture auth contract', () => {
     vi.restoreAllMocks();
     vi.stubEnv('E2E_SEED_PROJECT_RUN_ID', '22222222-2222-4222-8222-222222222222');
   });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
 
   it('authenticates two isolated contexts from persisted storage without login', async () => {
     const pageA = createHealthySeedAuthPage();
@@ -133,7 +154,12 @@ describe('phase-two fixture auth contract', () => {
 
     const resultA = await reuseSeedAuthSession(pageA as never);
     expect(resultA.sessionMutated).toBe(true);
-    expect(pageA.request.patch).toHaveBeenCalledTimes(1);
+    expect(pageA.request.patch).not.toHaveBeenCalled();
+    expect(pageA.evaluate).toHaveBeenCalledTimes(1);
+    expect(pageA.fetchMock).toHaveBeenCalledTimes(2);
+    await expect(pageA.context().cookies()).resolves.toEqual([
+      { name: 'jagalchi-session', value: '1' },
+    ]);
 
     if (resultA.sessionMutated) {
       await persistSeedAuthStorage(pageA as never);

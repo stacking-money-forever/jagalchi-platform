@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type APIResponse, type Page } from '@playwright/test';
 
 import { readSeedAuthCredentials } from './auth-state';
 import { loginWithSeedUser, required } from './helpers';
@@ -20,6 +20,7 @@ export async function probeEntitledSeedSession(
   return page.request.get(`/api/project-runs/${projectRunId}`);
 }
 
+const E2E_BASE_ORIGIN = new URL(process.env.E2E_BASE_URL ?? 'http://127.0.0.1:3100').origin;
 const SESSION_COOKIE_KEY = 'jagalchi-session';
 
 async function hasUiSessionCookie(page: Page): Promise<boolean> {
@@ -27,48 +28,66 @@ async function hasUiSessionCookie(page: Page): Promise<boolean> {
   return cookies.some((cookie) => cookie.name === SESSION_COOKIE_KEY && cookie.value === '1');
 }
 
-async function refreshSessionHint(page: Page): Promise<boolean> {
-  const csrfResponse = await page.request.get('/api/csrf-token');
-  if (!csrfResponse.ok()) {
-    return false;
+async function ensureBaseOrigin(page: Page): Promise<void> {
+  let currentOrigin: string | undefined;
+  try {
+    currentOrigin = new URL(page.url()).origin;
+  } catch {
+    currentOrigin = undefined;
   }
 
-  const { token } = (await csrfResponse.json()) as { token?: string };
-  if (!token) {
-    return false;
+  if (currentOrigin !== E2E_BASE_ORIGIN) {
+    await page.goto(`${E2E_BASE_ORIGIN}/`);
   }
-
-  const refreshResponse = await page.request.patch('/api/users/auth/refresh', {
-    headers: {
-      'content-type': 'application/json',
-      'x-csrf-token': token,
-    },
-  });
-  assertProbeNotRateLimited(refreshResponse.status());
-  return refreshResponse.ok() && (await hasUiSessionCookie(page));
 }
 
-/** @returns true when refresh or navigation established the UI session hint cookie */
+async function refreshSessionHint(page: Page): Promise<boolean> {
+  await ensureBaseOrigin(page);
+
+  let refreshResult: { stage: 'csrf' | 'refresh'; status: number };
+  try {
+    refreshResult = await page.evaluate(async () => {
+      const csrfResponse = await fetch('/api/csrf-token', {
+        credentials: 'same-origin',
+      });
+      if (!csrfResponse.ok) {
+        return { stage: 'csrf' as const, status: csrfResponse.status };
+      }
+
+      const body = (await csrfResponse.json().catch(() => undefined)) as
+        { token?: unknown } | undefined;
+      if (typeof body?.token !== 'string' || body.token.length === 0) {
+        return { stage: 'csrf' as const, status: csrfResponse.status };
+      }
+
+      const refreshResponse = await fetch('/api/users/auth/refresh', {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: {
+          'content-type': 'application/json',
+          'X-CSRF-Token': body.token,
+        },
+      });
+      return { stage: 'refresh' as const, status: refreshResponse.status };
+    });
+  } catch {
+    return false;
+  }
+
+  assertProbeNotRateLimited(refreshResult.status);
+  if (refreshResult.stage !== 'refresh' || refreshResult.status !== 200) {
+    return false;
+  }
+  return hasUiSessionCookie(page);
+}
+
+/** @returns true when one browser refresh or navigation established the UI session hint cookie */
 export async function hydrateUiSession(page: Page): Promise<boolean> {
   if (await hasUiSessionCookie(page)) {
     return false;
   }
 
-  if (await refreshSessionHint(page)) {
-    return true;
-  }
-
-  await page.goto('/');
-  if (await hasUiSessionCookie(page)) {
-    return true;
-  }
-
-  if (await refreshSessionHint(page)) {
-    return true;
-  }
-
-  await expect.poll(async () => hasUiSessionCookie(page), { timeout: 10_000 }).toBe(true);
-  return true;
+  return refreshSessionHint(page);
 }
 
 export const SEED_AUTH_REUSE_ERROR =
@@ -83,46 +102,36 @@ async function recoverEntitledSeedSessionProbe(
   page: Page,
   projectRunId: string,
 ): Promise<{
-  sessionProbe: Awaited<ReturnType<typeof probeEntitledSeedSession>>;
+  sessionProbe: APIResponse;
   sessionMutated: boolean;
+  recoveryAttempted: boolean;
 }> {
-  let sessionMutated = false;
   let sessionProbe = await probeEntitledSeedSession(page, projectRunId);
   assertProbeNotRateLimited(sessionProbe.status());
   if (sessionProbe.status() === 200) {
-    return { sessionProbe, sessionMutated };
+    return { sessionProbe, sessionMutated: false, recoveryAttempted: false };
   }
 
-  if (await refreshSessionHint(page)) {
-    sessionMutated = true;
-    sessionProbe = await probeEntitledSeedSession(page, projectRunId);
-    assertProbeNotRateLimited(sessionProbe.status());
-    if (sessionProbe.status() === 200) {
-      return { sessionProbe, sessionMutated };
-    }
-  }
-
-  if (await hydrateUiSession(page)) {
-    sessionMutated = true;
-  }
+  const sessionMutated = await refreshSessionHint(page);
   sessionProbe = await probeEntitledSeedSession(page, projectRunId);
   assertProbeNotRateLimited(sessionProbe.status());
-  return { sessionProbe, sessionMutated };
+  return { sessionProbe, sessionMutated, recoveryAttempted: true };
 }
 
 export async function reuseSeedAuthSession(page: Page): Promise<ReuseSeedAuthSessionResult> {
   const projectRunId = required('E2E_SEED_PROJECT_RUN_ID');
-  const { sessionProbe, sessionMutated: recovered } = await recoverEntitledSeedSessionProbe(
-    page,
-    projectRunId,
-  );
+  const {
+    sessionProbe,
+    sessionMutated: recovered,
+    recoveryAttempted,
+  } = await recoverEntitledSeedSessionProbe(page, projectRunId);
 
   if (sessionProbe.status() !== 200) {
     throw new Error(SEED_AUTH_REUSE_ERROR);
   }
 
   let sessionMutated = recovered;
-  if (!(await hasUiSessionCookie(page))) {
+  if (!(await hasUiSessionCookie(page)) && !recoveryAttempted) {
     sessionMutated = (await hydrateUiSession(page)) || sessionMutated;
   }
 
