@@ -35,7 +35,7 @@ export default function CreatePage() {
           <div className="grid gap-5 md:grid-cols-2">
             {evidenceEnabled ? (
               <Link
-                href="/career"
+                href="/projects/new"
                 className="group border-primary/30 bg-primary-subtle hover:border-primary/60 focus-visible:ring-ring flex min-h-80 flex-col rounded-3xl border p-6 transition-[transform,box-shadow,border-color] outline-none hover:-translate-y-0.5 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-offset-2 sm:p-8"
               >
                 <span className="bg-primary text-primary-foreground flex size-12 items-center justify-center rounded-2xl shadow-sm">
