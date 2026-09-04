@@ -1,4 +1,10 @@
-import type { WorkflowOperationView } from '@jagalchi/api-client';
+import {
+  createApiTransport,
+  getWorkflowOperation,
+  type WorkflowOperationView,
+} from '@jagalchi/api-client';
+
+import { createCsrfAwareFetch } from '@/api/client';
 
 export function parseRetryAfterMs(response: Response, fallbackMs = 2000): number {
   const header = response.headers.get('Retry-After');
@@ -10,23 +16,21 @@ export function parseRetryAfterMs(response: Response, fallbackMs = 2000): number
   return fallbackMs;
 }
 
+let lastRetryAfterMs = 2000;
+
+const csrfFetch = createCsrfAwareFetch();
+const pollingFetch: typeof fetch = async (input, init) => {
+  const response = await csrfFetch(input, init);
+  lastRetryAfterMs = parseRetryAfterMs(response);
+  return response;
+};
+
+const workflowPollingTransport = createApiTransport('/api', pollingFetch);
+
 export async function fetchWorkflowOperation(
   operationId: string,
   signal?: AbortSignal,
 ): Promise<{ operation: WorkflowOperationView; retryAfterMs: number }> {
-  const response = await fetch(`/api/workflow-operations/${encodeURIComponent(operationId)}`, {
-    method: 'GET',
-    signal,
-    credentials: 'include',
-  });
-  if (!response.ok) {
-    const error = (await response.json().catch(() => undefined)) as
-      { code?: string; message?: string } | undefined;
-    const failure = new Error(error?.message ?? '워크플로 상태를 불러오지 못했습니다.');
-    (failure as Error & { status?: number; code?: string }).status = response.status;
-    (failure as Error & { status?: number; code?: string }).code = error?.code;
-    throw failure;
-  }
-  const operation = (await response.json()) as WorkflowOperationView;
-  return { operation, retryAfterMs: parseRetryAfterMs(response) };
+  const operation = await getWorkflowOperation(workflowPollingTransport, operationId, signal);
+  return { operation, retryAfterMs: lastRetryAfterMs };
 }

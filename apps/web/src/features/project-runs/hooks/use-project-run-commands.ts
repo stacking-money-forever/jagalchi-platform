@@ -16,7 +16,9 @@ import {
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { nanoid } from 'nanoid';
 
-const transport = createApiTransport('/api', fetch);
+import { createCsrfAwareFetch } from '@/api/client';
+
+const transport = createApiTransport('/api', createCsrfAwareFetch());
 
 type CommandArgs = { taskId: string };
 
