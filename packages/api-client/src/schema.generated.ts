@@ -1684,6 +1684,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/career/eligible-github-repositories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CareerV1Controller_listEligibleGithubRepositories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/career/target-versions/{id}": {
         parameters: {
             query?: never;
@@ -2110,6 +2126,46 @@ export interface components {
             targetId: string;
             competencySlugs: string[];
         };
+        WorkflowOperationResultDto: {
+            resourceType: string;
+            /** Format: uuid */
+            resourceId: string;
+            /** @example /api/career/target-versions/00000000-0000-4000-8000-000000000001 */
+            resourceHref: string;
+        };
+        WorkflowOperationErrorDto: {
+            /** @example AI_PLAN_MALFORMED */
+            code: string;
+            retryable: boolean;
+        };
+        WorkflowOperationResponseDto: {
+            /** Format: uuid */
+            id: string;
+            kind: string;
+            /** @enum {string} */
+            state: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED" | "CANCEL_REQUESTED";
+            version: number;
+            attempt: number;
+            maxAttempts: number;
+            /** Format: date-time */
+            nextAttemptAt: string | null;
+            result: components["schemas"]["WorkflowOperationResultDto"] | null;
+            error: components["schemas"]["WorkflowOperationErrorDto"] | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            body: {
+                [key: string]: unknown;
+            } | null;
+        };
+        WorkflowOperationCancelResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            state: "CANCELLED" | "CANCEL_REQUESTED";
+            version: number;
+        };
         TargetInputDto: {
             /** @enum {string} */
             kind: "FETCHED_URL" | "MANUAL_CAPTURE";
@@ -2136,6 +2192,12 @@ export interface components {
         ProfileSnapshotOperationDto: {
             /** @description Empty selects all eligible installed repositories within the server cap. */
             repositoryIds: string[];
+        };
+        EligibleGithubRepositoryDto: {
+            repositoryId: string;
+            name: string;
+            fullName: string;
+            private: boolean;
         };
         CompetencyCorrectionDto: {
             competencyId: string;
@@ -4552,7 +4614,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["WorkflowOperationResponseDto"];
+                };
             };
         };
     };
@@ -4590,7 +4654,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["WorkflowOperationResponseDto"];
+                };
             };
         };
     };
@@ -4612,7 +4678,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["WorkflowOperationCancelResponseDto"];
+                };
             };
         };
     };
@@ -4631,11 +4699,16 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Workflow operation accepted for asynchronous processing */
             202: {
                 headers: {
+                    /** @description Seconds before polling GET /api/workflow-operations/{id} again */
+                    "Retry-After"?: number;
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["WorkflowOperationResponseDto"];
+                };
             };
         };
     };
@@ -4654,11 +4727,35 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Workflow operation accepted for asynchronous processing */
             202: {
+                headers: {
+                    /** @description Seconds before polling GET /api/workflow-operations/{id} again */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowOperationResponseDto"];
+                };
+            };
+        };
+    };
+    CareerV1Controller_listEligibleGithubRepositories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["EligibleGithubRepositoryDto"][];
+                };
             };
         };
     };
@@ -4717,6 +4814,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Confirmed profile snapshot */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -4742,6 +4840,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Draft career diff snapshot */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -4786,6 +4885,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Confirmed career diff snapshot */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -4811,11 +4911,16 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Workflow operation accepted for asynchronous processing */
             202: {
                 headers: {
+                    /** @description Seconds before polling GET /api/workflow-operations/{id} again */
+                    "Retry-After"?: number;
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["WorkflowOperationResponseDto"];
+                };
             };
         };
     };
@@ -4853,11 +4958,16 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Workflow operation accepted for asynchronous processing */
             202: {
                 headers: {
+                    /** @description Seconds before polling GET /api/workflow-operations/{id} again */
+                    "Retry-After"?: number;
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["WorkflowOperationResponseDto"];
+                };
             };
         };
     };

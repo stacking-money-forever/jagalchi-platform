@@ -10,6 +10,7 @@ export type ProjectProposalOperationDto = components['schemas']['ProjectProposal
 export type CreateProjectRunOperationDto = components['schemas']['CreateProjectRunOperationDto'];
 export type RepositoryBindingDto = components['schemas']['RepositoryBindingDto'];
 export type ProposalConstraintsDto = components['schemas']['ProposalConstraintsDto'];
+export type EligibleGithubRepositoryDto = components['schemas']['EligibleGithubRepositoryDto'];
 
 export type RepositoryMode = RepositoryBindingDto['mode'];
 
@@ -273,4 +274,10 @@ export function cancelWorkflowOperation(
 
 export function isWorkflowTerminal(state: WorkflowOperationState): boolean {
   return state === 'SUCCEEDED' || state === 'FAILED' || state === 'CANCELLED';
+}
+
+export function getEligibleGithubRepositories(
+  transport: ApiTransport,
+): Promise<EligibleGithubRepositoryDto[]> {
+  return transport.request<EligibleGithubRepositoryDto[]>('/career/eligible-github-repositories');
 }
