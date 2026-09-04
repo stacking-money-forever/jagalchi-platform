@@ -15,18 +15,19 @@ import {
   FIXTURE_JOB_POSTING_URL,
   getCandidateProfileSnapshot,
   getCareerTargetVersion,
+  getEligibleGithubRepositories,
   getProjectProposalSet,
   importCareerTarget,
   REPOSITORY_MODE_ORDER,
   startGithubProfileSnapshot,
   startProjectProposalOperation,
   type CareerSnapshotRecord,
+  type EligibleGithubRepositoryDto,
   type ProjectProposalRecord,
   type RepositoryBindingDto,
   type WorkflowOperationView,
 } from '@jagalchi/api-client';
 
-import { listGithubRepositories, type GithubRepository } from '@/api/github';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -134,7 +135,7 @@ export function TargetEntryWizard() {
   const [proposals, setProposals] = useState<ProjectProposalRecord[]>([]);
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const [repositoryBinding, setRepositoryBinding] = useState<RepositoryBindingDto | null>(null);
-  const [githubRepositories, setGithubRepositories] = useState<GithubRepository[]>([]);
+  const [githubRepositories, setGithubRepositories] = useState<EligibleGithubRepositoryDto[]>([]);
   const [selectedRepositoryId, setSelectedRepositoryId] = useState<string>('');
   const [profileReviewDraft, setProfileReviewDraft] =
     useState<ProfileReviewDraft>(EMPTY_PROFILE_DRAFT);
@@ -429,7 +430,7 @@ export function TargetEntryWizard() {
     setSelectedRepositoryId('');
     if (preferred === 'EXISTING_OWNED') {
       try {
-        const repos = await listGithubRepositories();
+        const repos = await getEligibleGithubRepositories(entryTransport);
         setGithubRepositories(repos);
       } catch (error) {
         handleGateError(error);

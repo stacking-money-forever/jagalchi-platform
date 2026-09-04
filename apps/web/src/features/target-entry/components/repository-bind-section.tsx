@@ -1,12 +1,15 @@
 'use client';
 
-import type { GithubRepository } from '@/api/github';
 import { Button } from '@/components/ui/button';
 
 import { repositoryModeLabel } from '../lib/proposal-presenter';
 import { bindingForMode, isRepositoryBindingComplete } from '../lib/repository-modes';
 
-import type { RepositoryBindingDto, RepositoryMode } from '@jagalchi/api-client';
+import type {
+  EligibleGithubRepositoryDto,
+  RepositoryBindingDto,
+  RepositoryMode,
+} from '@jagalchi/api-client';
 
 export function RepositoryBindSection({
   allowedModes,
@@ -19,7 +22,7 @@ export function RepositoryBindSection({
 }: {
   allowedModes: RepositoryMode[];
   binding: RepositoryBindingDto;
-  repositories: GithubRepository[];
+  repositories: EligibleGithubRepositoryDto[];
   selectedRepositoryId: string;
   onSelectRepository: (value: string) => void;
   onChangeMode: (mode: RepositoryMode) => void;
