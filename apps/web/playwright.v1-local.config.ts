@@ -6,6 +6,8 @@ import { defaultSeedAuthDir, resolveSeedAuthStoragePath } from './e2e-v1-local/a
 
 const baseURL = 'http://127.0.0.1:3100';
 const seedAuthStorageState = resolveSeedAuthStoragePath(defaultSeedAuthDir());
+// Infra browser gate always injects seed env; never attach to a stale dev server on :3100.
+const reuseExistingWebServer = !process.env.E2E_SEED_PROJECT_RUN_ID && !process.env.CI;
 
 export default defineConfig({
   testDir: './e2e-v1-local',
@@ -56,7 +58,7 @@ export default defineConfig({
       NEXT_PUBLIC_SITE_URL: baseURL,
     },
     url: baseURL,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: reuseExistingWebServer,
     timeout: 120_000,
   },
 });

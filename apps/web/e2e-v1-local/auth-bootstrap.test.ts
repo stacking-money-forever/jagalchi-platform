@@ -32,6 +32,28 @@ describe('auth-bootstrap', () => {
     );
   });
 
+  it('hydrates the UI session hint when the API probe succeeds without a cookie', async () => {
+    let cookieChecks = 0;
+    const page = {
+      request: {
+        get: vi.fn().mockResolvedValue({ status: () => 200 }),
+      },
+      goto: vi.fn().mockResolvedValue(undefined),
+      context: () => ({
+        cookies: vi.fn().mockImplementation(async () => {
+          cookieChecks += 1;
+          return cookieChecks >= 2 ? [{ name: 'jagalchi-session', value: '1' }] : [];
+        }),
+      }),
+    };
+
+    await authBootstrap.ensureSeedAuthSession(page as never);
+
+    expect(page.goto).toHaveBeenCalledWith('/');
+    expect(page.request.get).toHaveBeenCalledTimes(1);
+    expect(cookieChecks).toBeGreaterThanOrEqual(2);
+  });
+
   it('reuses an entitled session when the API probe and UI cookie are both present', async () => {
     const page = {
       request: {

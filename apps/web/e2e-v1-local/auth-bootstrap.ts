@@ -37,6 +37,13 @@ export async function ensureSeedAuthSession(page: Page): Promise<void> {
   let sessionProbe = await probeEntitledSeedSession(page, projectRunId);
   assertProbeNotRateLimited(sessionProbe.status());
 
+  if (sessionProbe.status() === 200 && !(await hasUiSessionCookie(page))) {
+    await hydrateUiSession(page);
+    if (await hasUiSessionCookie(page)) {
+      return;
+    }
+  }
+
   const needsLogin = sessionProbe.status() !== 200 || !(await hasUiSessionCookie(page));
   if (!needsLogin) {
     return;
@@ -44,6 +51,7 @@ export async function ensureSeedAuthSession(page: Page): Promise<void> {
 
   const { email, password, userId } = readSeedAuthCredentials();
   await loginWithSeedUser(page, email, password, userId);
+  await hydrateUiSession(page);
 
   sessionProbe = await probeEntitledSeedSession(page, projectRunId);
   assertProbeNotRateLimited(sessionProbe.status());
