@@ -19,4 +19,21 @@ describe('api-client', () => {
     expect(result.id).toBe('run-1');
     expect(projectRunQueryKey('run-1')).toEqual(['project-run', 'run-1']);
   });
+
+  it('sets application/json when posting a JSON body without an explicit content type', async () => {
+    let capturedHeaders: Headers | undefined;
+    const fetchImplementation = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      capturedHeaders = init?.headers as Headers | undefined;
+      return Response.json({ ok: true });
+    }) as typeof fetch;
+    const transport = createApiTransport('https://api.example.com', fetchImplementation);
+
+    await transport.request('/career/target-imports', {
+      method: 'POST',
+      body: JSON.stringify({ input: { kind: 'FETCHED_URL', url: 'https://example.com/job' } }),
+      headers: { 'idempotency-key': '11111111-1111-4111-8111-111111111111' },
+    });
+
+    expect(capturedHeaders?.get('content-type')).toBe('application/json');
+  });
 });

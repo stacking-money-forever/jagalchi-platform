@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node scripts/verify-prod-env.mjs",
+    "prebuild": "node scripts/verify-prod-env.mjs && pnpm --filter @jagalchi/api-client build",
     "build": "next build",
     "build:prod": "node scripts/verify-prod-env.mjs --production && next build",
     "build:analyze": "ANALYZE=true next build",

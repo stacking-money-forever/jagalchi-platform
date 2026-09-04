@@ -45,6 +45,9 @@ export function createApiTransport(
     async request<T>(path: string, init: RequestInit = {}): Promise<T> {
       const headers = new Headers(defaults.headers);
       new Headers(init.headers).forEach((value, name) => headers.set(name, value));
+      if (init.body !== undefined && init.body !== null && !headers.has('content-type')) {
+        headers.set('content-type', 'application/json');
+      }
       const response = await fetchImplementation(`${normalizedBaseUrl}/${path.replace(/^\//, '')}`, {
         ...defaults,
         ...init,
