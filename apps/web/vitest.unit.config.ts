@@ -15,7 +15,7 @@ export default defineConfig({
   test: {
     name: 'unit',
     environment: 'jsdom',
-    include: ['src/**/*.test.{ts,tsx}'],
+    include: ['src/**/*.test.{ts,tsx}', 'e2e-v1-local/**/*.test.ts'],
     setupFiles: ['./vitest.setup.ts'],
     testTimeout: 10000,
     globalSetup: ['./vitest.global-setup.ts'],

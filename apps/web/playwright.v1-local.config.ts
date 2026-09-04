@@ -1,9 +1,15 @@
+import path from 'node:path';
+
 import { defineConfig, devices } from '@playwright/test';
 
+import { defaultSeedAuthDir, resolveSeedAuthStoragePath } from './e2e-v1-local/auth-state';
+
 const baseURL = 'http://127.0.0.1:3100';
+const seedAuthStorageState = resolveSeedAuthStoragePath(defaultSeedAuthDir());
 
 export default defineConfig({
   testDir: './e2e-v1-local',
+  globalTeardown: './e2e-v1-local/auth.teardown.ts',
   timeout: 60_000,
   forbidOnly: true,
   retries: 0,
@@ -17,8 +23,18 @@ export default defineConfig({
   },
   projects: [
     {
+      name: 'setup-seed-auth',
+      testMatch: /auth\.setup\.ts/,
+    },
+    {
       name: 'chromium-no-msw',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: seedAuthStorageState,
+      },
+      // Optional: run setup-seed-auth first to reuse persisted storageState instead of worker login.
+      dependencies: ['setup-seed-auth'],
+      testIgnore: [/auth\.setup\.ts/, /\.test\.ts$/, /phase-two-fixtures\.ts$/],
     },
   ],
   webServer: {
@@ -39,7 +55,7 @@ export default defineConfig({
       NEXT_PUBLIC_SITE_URL: baseURL,
     },
     url: baseURL,
-    reuseExistingServer: false,
+    reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
 });

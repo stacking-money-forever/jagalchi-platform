@@ -59,4 +59,6 @@ visual-tests/
 # Playwright
 /test-results/
 /playwright-report/
+e2e-v1-local/.auth/
+
 /blob-report/

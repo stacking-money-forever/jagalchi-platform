@@ -1,16 +1,14 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './phase-two-fixtures';
 
 import {
+  expectRepositoryBindingName,
   fetchProjectRun,
-  loginWithSeedUser,
   openProjectRunWorkspace,
+  prepareAuthenticatedTestPage,
   required,
   selectWorkspaceTab,
 } from './helpers';
 
-const email = required('E2E_TEST_EMAIL');
-const password = required('E2E_TEST_PASSWORD');
-const userId = required('E2E_SEED_USER_ID');
 const projectRunId = required('E2E_SEED_PROJECT_RUN_ID');
 
 function focusAnchorTaskId(projection: Awaited<ReturnType<typeof fetchProjectRun>>) {
@@ -19,7 +17,7 @@ function focusAnchorTaskId(projection: Awaited<ReturnType<typeof fetchProjectRun
 
 test.describe('Phase 2 Wave A project run surfaces', () => {
   test.beforeEach(async ({ page }) => {
-    await loginWithSeedUser(page, email, password, userId);
+    await prepareAuthenticatedTestPage(page);
   });
 
   test('Map loads Nest milestones and tasks as a read-only graph', async ({ page }) => {
@@ -95,7 +93,7 @@ test.describe('Phase 2 Wave A project run surfaces', () => {
     await expect(page.getByLabel('저장소 바인딩')).toBeVisible();
 
     if (projection.repositoryBinding?.repositoryName) {
-      await expect(page.getByText(projection.repositoryBinding.repositoryName)).toBeVisible();
+      await expectRepositoryBindingName(page, projection.repositoryBinding.repositoryName);
     } else {
       await expect(page.getByText('바인딩 정보가 없습니다.')).toBeVisible();
     }

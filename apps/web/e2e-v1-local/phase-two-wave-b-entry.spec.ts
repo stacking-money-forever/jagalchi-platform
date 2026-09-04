@@ -1,21 +1,16 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './phase-two-fixtures';
 
 import { FIXTURE_MANUAL_CAPTURE_SOURCE_TEXT } from '@jagalchi/api-client';
 
 import {
   completeWaveBWizardFromProfileReview,
-  loginWithSeedUser,
   openWaveBTargetEntry,
-  required,
+  prepareAuthenticatedTestPage,
 } from './helpers';
-
-const email = required('E2E_TEST_EMAIL');
-const password = required('E2E_TEST_PASSWORD');
-const userId = required('E2E_SEED_USER_ID');
 
 test.describe('Phase 2 Wave B target entry', () => {
   test.beforeEach(async ({ page }) => {
-    await loginWithSeedUser(page, email, password, userId);
+    await prepareAuthenticatedTestPage(page);
   });
 
   test('fixture intake can reach project run map', async ({ page }) => {

@@ -33,6 +33,9 @@ export async function loginWithSeedUser(
   );
   await page.getByRole('button', { name: '로그인', exact: true }).click();
   const completedLogin = await loginResponse;
+  if (completedLogin.status() === 429) {
+    throw new Error('seed login was rate limited; refusing blind retry');
+  }
   expect(completedLogin.status()).toBe(200);
   expect((await completedLogin.json()).user.id).toBe(userId);
   await expect(page).toHaveURL(/\/$/);
@@ -96,6 +99,26 @@ export async function openProjectRunWorkspace(page: Page, projectRunId: string) 
 export async function selectWorkspaceTab(page: Page, label: '지도' | '포커스' | 'Proof') {
   await page.getByRole('tab', { name: label }).click();
   await expect(page.getByRole('tab', { name: label })).toHaveAttribute('aria-selected', 'true');
+}
+
+export function repositoryBindingValueLocator(page: Page, repositoryName: string) {
+  return page
+    .getByLabel('저장소 바인딩')
+    .getByRole('definition', { name: repositoryName, exact: true });
+}
+
+export async function expectRepositoryBindingName(page: Page, repositoryName: string) {
+  await expect(repositoryBindingValueLocator(page, repositoryName)).toBeVisible();
+}
+
+export async function ensureSeedSession(page: Page): Promise<void> {
+  const { ensureSeedAuthSession } = await import('./auth-bootstrap');
+  await ensureSeedAuthSession(page);
+}
+
+export async function prepareAuthenticatedTestPage(page: Page) {
+  await page.goto('/');
+  await expectNoServiceWorker(page);
 }
 
 export async function openWaveBTargetEntry(page: Page) {
