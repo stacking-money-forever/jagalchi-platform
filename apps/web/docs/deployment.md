@@ -1,6 +1,10 @@
 # Deployment
 
-Jagalchi Client 의 프로덕션 배포 가이드. 운영 타깃은 **Vercel** 을 단일 표준으로 본다. `Dockerfile`, `docker-compose.yml`, `netlify.toml` 은 자체 호스팅/백업 용도로 유지.
+Jagalchi Client 의 프로덕션 배포 가이드. 운영 타깃은 **Vercel** 을 단일 표준으로 본다.
+Personal-server VM compose, deploy automation, and backend image build live in
+`jagalchi-infra` (production) and `jagalchi-api` / `jagalchi-ai` (GHCR images).
+This platform repo does not ship compose or deploy assets. `Dockerfile` and
+`netlify.toml` under `apps/web/` remain reference-only for alternate hosting.
 
 ## 환경변수 매트릭스
 

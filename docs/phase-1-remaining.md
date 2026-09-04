@@ -95,7 +95,7 @@ Major Phase 1 구현은 사용자 요청에 따라 여기서 일시 정지한다
 - Platform: 157개 web test file, 1,060 tests; mobile 10 tests; Node 24 production build 통과.
 - API: 55개 test file, 423 tests (2026-09-03 최종 통합 검증 완료).
 - AI: 74 tests, internal-v1 8 schema, legacy 7 mapping, fake four-endpoint chain 통과.
-- Infra: 20 tests 및 Compose config 통과 (2026-09-03 재통과). 단, `deploy/tests/`는 `__init__.py` 없이는 `unittest discover`가 시작 디렉터리를 import하지 못하므로 임시 생성 후 실행함 — CI(ubuntu)와 무관한 로컬 실행 편의 문제.
+- Infra: 20 tests 및 Compose config 통과 (2026-09-03 재통과). Infra `deploy/tests/` lives in the `jagalchi-infra` worktree only.
 - 실제 실행: empty-volume `ci` acceptance, Wanted `ci-real-source` acceptance, no-MSW browser E2E, live DeepSeek `local` acceptance가 2026-09-03 최신 코드로 모두 통과했다. receipt는 Infra worktree `.evidence/`에 보존됨.
 
 현재 Docker의 API, workflow worker, AI, PostgreSQL 두 개와 MinIO는 healthy 상태다. 종료가 필요하면 Infra worktree에서 `deploy/local-down.sh /tmp/jagalchi-phase1-real-source.env`를 사용한다.

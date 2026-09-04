@@ -1,10 +1,22 @@
 # Platform architecture
 
-This repository is the platform delivery surface: Next.js web, Expo mobile, and the
-platform-neutral `@jagalchi/api-client`. The copied `services/api` and `services/ai`
-directories are historical deployment material and are intentionally excluded from
-the pnpm workspace and platform CI. Their canonical services are maintained and
-deployed from their standalone repositories.
+This repository is the platform delivery surface: Next.js web (Vercel), Expo mobile,
+and the platform-neutral `@jagalchi/api-client`. Backend runtime and personal-server
+infra are **not** vendored here. Canonical ownership:
+
+| Concern | Repository |
+| --- | --- |
+| Nest API + workflow worker | `jagalchi-api` |
+| Django AI service | `jagalchi-ai` |
+| VM compose, deploy, local acceptance | `jagalchi-infra` |
+
+Platform CI covers web, mobile, and `@jagalchi/api-client` only. Local v1 harness
+scripts delegate to `jagalchi-infra/deploy/local-*.sh` via `JAGALCHI_INFRA_DIR`.
+
+**Release order:** infra production cutover (VM retarget to `/srv/jagalchi-infra`,
+GHCR `API_IMAGE`/`AI_IMAGE` pins, one deploy/smoke cycle) must land before platform
+drops any duplicated compose/deploy copies. Phase 2 removed those copies at HEAD after
+the production cutover receipts were recorded.
 
 ## Supported version boundary
 
