@@ -1,4 +1,3 @@
-import { aiHandlers } from './ai';
 import { authHandlers } from './auth';
 import { careerHandlers } from './career';
 import { githubHandlers } from './github';
@@ -11,5 +10,4 @@ export const handlers = [
   ...githubHandlers,
   ...roadmapHandlers,
   ...profileHandlers,
-  ...aiHandlers,
 ];
