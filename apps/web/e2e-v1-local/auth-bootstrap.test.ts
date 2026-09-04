@@ -45,8 +45,8 @@ describe('auth-bootstrap', () => {
             status: () => 200,
             ok: () => true,
             json: async () => ({ token: 'csrf' }),
-          })
-          .mockResolvedValueOnce({ status: () => 200, ok: () => true }),
+          }),
+        patch: vi.fn().mockResolvedValue({ status: () => 200, ok: () => true }),
       },
       goto: vi.fn().mockResolvedValue(undefined),
       context: () => ({
@@ -56,7 +56,8 @@ describe('auth-bootstrap', () => {
 
     await reuseSeedAuthSession(page as never);
 
-    expect(page.request.get).toHaveBeenCalledTimes(1);
+    expect(page.request.get).toHaveBeenCalledTimes(2);
+    expect(page.request.patch).toHaveBeenCalledTimes(1);
     expect(page.goto).not.toHaveBeenCalled();
   });
 

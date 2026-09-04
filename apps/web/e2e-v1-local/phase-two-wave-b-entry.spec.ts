@@ -2,9 +2,17 @@ import { expect, test } from './phase-two-fixtures';
 
 import { FIXTURE_JOB_POSTING_URL, FIXTURE_MANUAL_CAPTURE_SOURCE_TEXT } from '@jagalchi/api-client';
 
-import { completeWaveBWizardFromProfileReview, openWaveBTargetEntry } from './helpers';
+import {
+  completeWaveBWizardFromProfileReview,
+  ensureSeedSession,
+  openWaveBTargetEntry,
+} from './helpers';
 
 test.describe('Phase 2 Wave B target entry', () => {
+  test.beforeEach(async ({ page }) => {
+    await ensureSeedSession(page);
+  });
+
   test('fixture intake can reach project run map', async ({ page }) => {
     test.setTimeout(300_000);
 

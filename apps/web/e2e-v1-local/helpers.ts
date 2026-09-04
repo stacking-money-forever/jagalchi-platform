@@ -253,6 +253,8 @@ export async function selectWaveBExistingRepository(
 }
 
 export async function completeWaveBWizardFromProfileReview(page: Page) {
+  await ensureSeedSession(page);
+  await expect(page.getByRole('heading', { name: '로그인이 필요합니다' })).not.toBeVisible();
   await expect(page.getByRole('heading', { name: 'GitHub 증거 스냅샷 검토' })).toBeVisible({
     timeout: 180_000,
   });

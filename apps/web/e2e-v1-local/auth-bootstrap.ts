@@ -83,6 +83,8 @@ export async function reuseSeedAuthSession(page: Page): Promise<void> {
 
   if (!(await hasUiSessionCookie(page))) {
     await hydrateUiSession(page);
+  } else {
+    await refreshSessionHint(page);
   }
 
   expect(
