@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -25,6 +25,7 @@ import {
   type EligibleGithubRepositoryDto,
   type ProjectProposalRecord,
   type RepositoryBindingDto,
+  type RepositoryMode,
   type WorkflowOperationView,
 } from '@jagalchi/api-client';
 
@@ -136,6 +137,8 @@ export function TargetEntryWizard() {
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const [repositoryBinding, setRepositoryBinding] = useState<RepositoryBindingDto | null>(null);
   const [githubRepositories, setGithubRepositories] = useState<EligibleGithubRepositoryDto[]>([]);
+  const githubRepositoriesLoadedRef = useRef(false);
+  const githubRepositoriesRequestRef = useRef<Promise<void> | null>(null);
   const [selectedRepositoryId, setSelectedRepositoryId] = useState<string>('');
   const [profileReviewDraft, setProfileReviewDraft] =
     useState<ProfileReviewDraft>(EMPTY_PROFILE_DRAFT);
@@ -427,6 +430,27 @@ export function TargetEntryWizard() {
     }
   }, [careerTargetId, diffGaps, diffReviewDraft, diffSnapshot, handleGateError, runOperation]);
 
+  const loadEligibleGithubRepositories = useCallback(async () => {
+    if (githubRepositoriesLoadedRef.current) return;
+    if (githubRepositoriesRequestRef.current) {
+      await githubRepositoriesRequestRef.current;
+      return;
+    }
+
+    const request = getEligibleGithubRepositories(entryTransport).then((repos) => {
+      githubRepositoriesLoadedRef.current = true;
+      setGithubRepositories(repos);
+    });
+    githubRepositoriesRequestRef.current = request;
+    try {
+      await request;
+    } finally {
+      if (githubRepositoriesRequestRef.current === request) {
+        githubRepositoriesRequestRef.current = null;
+      }
+    }
+  }, []);
+
   const enterRepositoryBind = useCallback(async () => {
     if (!selectedProposal) return;
     resetFailure();
@@ -438,14 +462,24 @@ export function TargetEntryWizard() {
     setSelectedRepositoryId('');
     if (preferred === 'EXISTING_OWNED') {
       try {
-        const repos = await getEligibleGithubRepositories(entryTransport);
-        setGithubRepositories(repos);
+        await loadEligibleGithubRepositories();
       } catch (error) {
         handleGateError(error);
       }
     }
     setStep('repository-bind');
-  }, [allowedRepositoryModes, handleGateError, selectedProposal]);
+  }, [allowedRepositoryModes, handleGateError, loadEligibleGithubRepositories, selectedProposal]);
+
+  const handleRepositoryModeChange = useCallback(
+    (mode: RepositoryMode) => {
+      setRepositoryBinding(bindingForMode(mode, selectedRepositoryId));
+      if (mode !== 'EXISTING_OWNED') return;
+      void loadEligibleGithubRepositories().catch((error: unknown) => {
+        handleGateError(error);
+      });
+    },
+    [handleGateError, loadEligibleGithubRepositories, selectedRepositoryId],
+  );
 
   const enterPlanConfirm = useCallback(() => {
     if (!selectedProposal || !repositoryBinding) return;
@@ -670,9 +704,7 @@ export function TargetEntryWizard() {
             setSelectedRepositoryId(value);
             setRepositoryBinding(bindingForMode('EXISTING_OWNED', value));
           }}
-          onChangeMode={(mode) => {
-            setRepositoryBinding(bindingForMode(mode, selectedRepositoryId));
-          }}
+          onChangeMode={handleRepositoryModeChange}
           onContinue={enterPlanConfirm}
         />
       ) : null}
