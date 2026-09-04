@@ -219,9 +219,9 @@ export async function expectProofWorkspaceReady(
 
 export async function ensureSeedSession(page: Page): Promise<void> {
   const { reuseSeedAuthSession } = await import('./auth-bootstrap');
-  const { resolveSeedAuthStoragePath } = await import('./auth-state');
+  const { persistSeedAuthStorage } = await import('./seed-auth-storage');
   await reuseSeedAuthSession(page);
-  await page.context().storageState({ path: resolveSeedAuthStoragePath() });
+  await persistSeedAuthStorage(page);
 }
 
 export async function prepareAuthenticatedTestPage(page: Page) {
