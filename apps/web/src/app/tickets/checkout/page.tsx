@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 
 import Link from 'next/link';
-import { notFound, redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 
 import { ArrowLeft, Ticket } from 'lucide-react';
 
@@ -21,10 +21,6 @@ async function TicketCheckoutContent({
 }: {
   searchParams: Promise<{ pack?: string | string[] }>;
 }) {
-  if (process.env.NEXT_PUBLIC_AI_FEATURES_ENABLED !== 'true') {
-    redirect('/career');
-  }
-
   const rawPack = (await searchParams).pack;
   const packId = Array.isArray(rawPack) ? rawPack[0] : rawPack;
   const pack = TICKET_PACKS.find((candidate) => candidate.id === packId);

@@ -10,6 +10,10 @@ const forbidden = [
     pattern: /\b(?:getLearningCoach|getRecordCoach|getNodeDescription|getResourceRecommendation)\b/,
   },
   {
+    label: 'legacy Nest AI jobs adapter',
+    pattern: /\brunAiJob\b/,
+  },
+  {
     label: 'legacy attachment upload endpoint',
     pattern: /\/uploads\/attachments\b/,
   },

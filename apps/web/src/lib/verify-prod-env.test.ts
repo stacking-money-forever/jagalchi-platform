@@ -6,7 +6,6 @@ import { describe, expect, it } from 'vitest';
 const script = resolve(process.cwd(), 'scripts/verify-prod-env.mjs');
 
 const productionFeatureFlags = {
-  NEXT_PUBLIC_AI_FEATURES_ENABLED: 'true',
   NEXT_PUBLIC_REALTIME_ENABLED: 'true',
   NEXT_PUBLIC_EVIDENCE_EXECUTION_ENABLED: 'true',
   NEXT_PUBLIC_PROOF_PROFILE_ENABLED: 'true',
@@ -123,7 +122,6 @@ describe('verify-prod-env analytics gate', () => {
   });
 
   it.each([
-    'NEXT_PUBLIC_AI_FEATURES_ENABLED',
     'NEXT_PUBLIC_REALTIME_ENABLED',
     'NEXT_PUBLIC_EVIDENCE_EXECUTION_ENABLED',
     'NEXT_PUBLIC_PROOF_PROFILE_ENABLED',
@@ -145,7 +143,6 @@ describe('verify-prod-env analytics gate', () => {
   });
 
   it.each([
-    'NEXT_PUBLIC_AI_FEATURES_ENABLED',
     'NEXT_PUBLIC_REALTIME_ENABLED',
     'NEXT_PUBLIC_EVIDENCE_EXECUTION_ENABLED',
     'NEXT_PUBLIC_PROOF_PROFILE_ENABLED',

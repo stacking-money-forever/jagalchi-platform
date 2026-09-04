@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event';
 import { createStore, Provider } from 'jotai';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { runAiJob } from '@/api/ai-jobs';
 import { uploadRoadmapAttachment } from '@/api/uploads';
 
 import { NodePropertiesPanel } from '.';
@@ -12,7 +11,6 @@ import { nodesAtom } from '../../../stores/editor-atoms';
 
 import type { JagalchiNodeType } from '../../../types/editor.types';
 
-vi.mock('@/api/ai-jobs', () => ({ runAiJob: vi.fn() }));
 vi.mock('@/api/uploads', () => ({ uploadRoadmapAttachment: vi.fn() }));
 
 const mockNode: JagalchiNodeType = {
@@ -44,7 +42,6 @@ const renderWithProvider = (node: JagalchiNodeType) => {
 
 describe('NodePropertiesPanel', () => {
   beforeEach(() => {
-    vi.mocked(runAiJob).mockReset();
     vi.mocked(uploadRoadmapAttachment).mockReset();
   });
 
@@ -68,35 +65,10 @@ describe('NodePropertiesPanel', () => {
     expect(screen.getByDisplayValue('Test Description')).toBeInTheDocument();
   });
 
-  it('renders AI generation text indicator', () => {
-    renderWithProvider(mockNode);
-    expect(screen.getByText('AI 생성')).toBeInTheDocument();
-  });
-
-  it('generates a description through the typed AI jobs adapter', async () => {
-    vi.mocked(runAiJob).mockResolvedValue({
-      node_title: 'Test Node',
-      description: 'Generated description',
-      generated_at: '',
-    });
-    const user = userEvent.setup();
-    const { store } = renderWithProvider(mockNode);
-
-    await user.click(screen.getByText('AI 생성'));
-
-    expect(runAiJob).toHaveBeenCalledWith('node_explanation', { node_title: 'Test Node' });
-    expect(store.get(nodesAtom)[0]?.data.description).toBe('Generated description');
-  });
-
   it('renders 3 resource input fields', () => {
     renderWithProvider(mockNode);
     const resourceInputs = screen.getAllByPlaceholderText('URL을 입력하세요');
     expect(resourceInputs).toHaveLength(3);
-  });
-
-  it('renders AI recommendation text indicator', () => {
-    renderWithProvider(mockNode);
-    expect(screen.getByText('AI 추천')).toBeInTheDocument();
   });
 
   it('renders attachment upload button', () => {

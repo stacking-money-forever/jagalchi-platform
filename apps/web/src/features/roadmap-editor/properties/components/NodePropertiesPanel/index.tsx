@@ -4,7 +4,6 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 import { Upload, X } from 'lucide-react';
 
-import { runAiJob } from '@/api/ai-jobs';
 import {
   ATTACHMENT_UPLOAD_CONSTRAINTS,
   AttachmentUploadError,
@@ -15,8 +14,6 @@ import { uploadRoadmapAttachment } from '@/api/uploads';
 import { Button } from '@/components/ui/button';
 import { EDITOR_MESSAGES } from '@/constants/messages';
 
-import { LoadingButton } from '../../../components/atoms/LoadingButton';
-import { ResourceRecommendationModal } from '../../../components/organisms/ResourceRecommendationModal';
 import { NODE_PRESET_COLORS } from '../../../constants/preset-colors';
 import { useUpdateNode } from '../../../hooks/use-update-node';
 import { validateUrl } from '../../../utils/url-validation';
@@ -33,14 +30,6 @@ interface NodePropertiesPanelProps {
 
 /**
  * Node 선택 시 표시되는 속성 패널
- *
- * Figma 디자인 기반 구조:
- * - Header: "Node_1" + Lock 버튼
- * - 노드 이름: EditorInput
- * - 노드 설명: EditorInput (multiline)
- * - AI 생성: LoadingButton
- * - 기본 컬러: ColorSelector
- * - 첨부자료: EditorInput 3개 + 파일 첨부 + "AI 추천" LoadingButton
  */
 export const NodePropertiesPanel = memo(function NodePropertiesPanel({
   node,
@@ -49,9 +38,6 @@ export const NodePropertiesPanel = memo(function NodePropertiesPanel({
   const { updateNode } = useUpdateNode(node.id);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadControllerRef = useRef<AbortController | null>(null);
-  const [isDescLoading, setIsDescLoading] = useState(false);
-  const [descError, setDescError] = useState('');
-  const [isResourceModalOpen, setIsResourceModalOpen] = useState(false);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
   const [attachmentUploadProgress, setAttachmentUploadProgress] = useState(0);
   const [attachmentUploadError, setAttachmentUploadError] = useState('');
@@ -85,30 +71,6 @@ export const NodePropertiesPanel = memo(function NodePropertiesPanel({
       updateNode({ resources: newResources });
     },
     [node.data.resources, updateNode],
-  );
-
-  const handleGenerateDescription = useCallback(async () => {
-    if (!node.data.label) return;
-    setIsDescLoading(true);
-    setDescError('');
-    try {
-      const response = await runAiJob('node_explanation', { node_title: node.data.label });
-      updateNode({ description: response.description });
-    } catch {
-      setDescError(EDITOR_MESSAGES.AI_DESC_ERROR);
-    } finally {
-      setIsDescLoading(false);
-    }
-  }, [node.data.label, updateNode]);
-
-  const handleAddResource = useCallback(
-    (url: string) => {
-      const emptyIndex = node.data.resources.findIndex((r) => !r);
-      if (emptyIndex !== -1) {
-        handleResourceChange(emptyIndex, url);
-      }
-    },
-    [node.data.resources, handleResourceChange],
   );
 
   const getAttachmentUploadErrorMessage = useCallback((code: AttachmentUploadErrorCode) => {
@@ -181,7 +143,6 @@ export const NodePropertiesPanel = memo(function NodePropertiesPanel({
     [getAttachmentUploadErrorMessage, handleResourceChange, node.data.resources, roadmapId],
   );
 
-  // Ensure we have exactly 3 resource slots
   const resources = [...node.data.resources];
   while (resources.length < 3) {
     resources.push('');
@@ -196,9 +157,7 @@ export const NodePropertiesPanel = memo(function NodePropertiesPanel({
         onToggleLock={toggleLock}
       />
 
-      {/* Content */}
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
-        {/* 노드 이름 */}
         <EditorInput
           label={EDITOR_MESSAGES.SIDEBAR_NODE_NAME_LABEL}
           value={node.data.label}
@@ -207,30 +166,15 @@ export const NodePropertiesPanel = memo(function NodePropertiesPanel({
           isDisabled={node.data.isLocked}
         />
 
-        {/* 노드 설명 */}
         <EditorInput
           label={EDITOR_MESSAGES.SIDEBAR_NODE_DESC_LABEL}
           value={node.data.description}
           onChange={(value) => updateNode({ description: value })}
           placeholder={EDITOR_MESSAGES.NODE_DESC_PLACEHOLDER}
           isMultiline
-          isDisabled={node.data.isLocked || isDescLoading}
+          isDisabled={node.data.isLocked}
         />
-        {descError && <p className="text-destructive text-xs">{descError}</p>}
-        <div className="flex justify-end">
-          <LoadingButton
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground h-auto p-0 text-sm font-medium hover:bg-transparent hover:underline"
-            isLoading={isDescLoading}
-            onClick={handleGenerateDescription}
-            disabled={node.data.isLocked || !node.data.label}
-          >
-            {isDescLoading ? EDITOR_MESSAGES.AI_DESC_LOADING : EDITOR_MESSAGES.AI_DESC_BUTTON}
-          </LoadingButton>
-        </div>
 
-        {/* 기본 컬러 */}
         <ColorSelector
           type="node"
           nodeId={node.id}
@@ -239,7 +183,6 @@ export const NodePropertiesPanel = memo(function NodePropertiesPanel({
           onPresetSelect={(variant) => updateNode({ variant: variant as NodeColorVariant })}
         />
 
-        {/* 첨부자료 */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
             <span className="text-foreground text-sm font-medium">
@@ -299,25 +242,8 @@ export const NodePropertiesPanel = memo(function NodePropertiesPanel({
           {attachmentUploadError && (
             <p className="text-destructive text-xs">{attachmentUploadError}</p>
           )}
-          <div className="flex justify-end">
-            <button
-              type="button"
-              className="text-muted-foreground text-sm font-medium hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={() => setIsResourceModalOpen(true)}
-              disabled={node.data.isLocked}
-            >
-              {EDITOR_MESSAGES.AI_RECOMMEND_BUTTON}
-            </button>
-          </div>
         </div>
       </div>
-
-      <ResourceRecommendationModal
-        isOpen={isResourceModalOpen}
-        onClose={() => setIsResourceModalOpen(false)}
-        nodeName={node.data.label}
-        onAddResource={handleAddResource}
-      />
     </div>
   );
 });

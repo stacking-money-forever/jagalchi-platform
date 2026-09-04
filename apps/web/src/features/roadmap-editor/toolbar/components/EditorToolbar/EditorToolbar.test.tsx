@@ -52,19 +52,6 @@ describe('EditorToolbar', () => {
     expect(textButton).toBeInTheDocument();
   });
 
-  it('renders EditorAiMenu', () => {
-    renderToolbar();
-    const aiMenuButton = screen.getByLabelText(/설정/);
-    expect(aiMenuButton).toBeInTheDocument();
-  });
-
-  it('has divider between tool buttons and AI menu', () => {
-    const { container } = renderToolbar();
-    const divider = container.querySelector('.w-px');
-    expect(divider).toBeInTheDocument();
-    expect(divider).toHaveClass('h-8');
-  });
-
   it('is fixed at bottom center', () => {
     const { container } = renderToolbar();
     const toolbar = container.querySelector('.fixed');

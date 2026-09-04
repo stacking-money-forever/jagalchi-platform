@@ -22,17 +22,13 @@ describe('consumer contract zero-gate', () => {
     );
   });
 
-  it('accepts the typed Nest AI jobs adapter', async () => {
-    const result = await runChecker("runAiJob('coaching', { question: 'next?' });");
-    expect(result.status).toBe(0);
+  it.each([
+    "runAiJob('coaching', { question: 'next?' });",
+    "getLearningCoach({ question: 'legacy' });",
+    "fetch('/uploads/attachments');",
+  ])('rejects a legacy consumer regression', async (source) => {
+    const result = await runChecker(source);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Consumer contract regression');
   });
-
-  it.each(["getLearningCoach({ question: 'legacy' });", "fetch('/uploads/attachments');"])(
-    'rejects a legacy consumer regression',
-    async (source) => {
-      const result = await runChecker(source);
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('Consumer contract regression');
-    },
-  );
 });
