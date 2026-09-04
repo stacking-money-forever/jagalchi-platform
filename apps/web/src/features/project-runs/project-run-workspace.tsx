@@ -9,11 +9,11 @@ import { ProjectRunFocusView } from './views/project-run-focus-view';
 import { ProjectRunMapView } from './views/project-run-map-view';
 import { ProjectRunProofView } from './views/project-run-proof-view';
 
-import type { ProjectRunProjectionEnvelope } from './projection/projection-contract';
+import type { ProjectRunProjection } from '@jagalchi/api-client';
 
 type Surface = 'map' | 'focus' | 'proof';
 
-export function ProjectRunWorkspace({ run }: { run: ProjectRunProjectionEnvelope }) {
+export function ProjectRunWorkspace({ run }: { run: ProjectRunProjection }) {
   const [surface, setSurface] = useState<Surface>('map');
   const { model, pathTaskIds } = useProjectRunProjection(run);
 

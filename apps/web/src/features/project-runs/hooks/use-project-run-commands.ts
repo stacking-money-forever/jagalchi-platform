@@ -11,11 +11,10 @@ import {
   startProjectRunTask,
   unpublishProjectRun,
   verifyProjectRunTask,
+  type ProjectRunProjection,
 } from '@jagalchi/api-client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { nanoid } from 'nanoid';
-
-import type { ProjectRunProjectionEnvelope } from '../projection/projection-contract';
 
 const transport = createApiTransport('/api', fetch);
 
@@ -24,13 +23,13 @@ type CommandArgs = { taskId: string };
 async function refreshRun(
   queryClient: ReturnType<typeof useQueryClient>,
   runId: string,
-): Promise<ProjectRunProjectionEnvelope> {
-  const next = (await getProjectRun(transport, runId)) as ProjectRunProjectionEnvelope;
+): Promise<ProjectRunProjection> {
+  const next = await getProjectRun(transport, runId);
   queryClient.setQueryData(projectRunQueryKey(runId), next);
   return next;
 }
 
-export function useProjectRunCommands(run: ProjectRunProjectionEnvelope) {
+export function useProjectRunCommands(run: ProjectRunProjection) {
   const queryClient = useQueryClient();
   const headers = () => ({ ifMatch: String(run.version), idempotencyKey: nanoid() });
 

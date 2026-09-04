@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button';
 
 import { StatusChip } from '../components/roadmap/status-presentation';
 import { useProjectRunCommands } from '../hooks/use-project-run-commands';
-import { evidenceRequirementLabelKo } from '../projection';
+import { evidenceRequirementLabelKo, readCareerTarget } from '../projection';
 
 import type { RoadmapGraphModel } from '../projection';
-import type { ProjectRunProjectionEnvelope } from '../projection/projection-contract';
+import type { ProjectRunProjection } from '@jagalchi/api-client';
 
 function taskById(model: RoadmapGraphModel, id: string | null) {
   if (!id) return null;
@@ -27,13 +27,14 @@ export function ProjectRunFocusView({
   run,
   model,
 }: {
-  run: ProjectRunProjectionEnvelope;
+  run: ProjectRunProjection;
   model: RoadmapGraphModel;
 }) {
   const commands = useProjectRunCommands(run);
   const current = taskById(model, run.currentTaskId);
   const recommended = taskById(model, run.recommendedTaskId);
   const focusTask = current ?? recommended;
+  const careerTarget = readCareerTarget(run.target);
 
   const citationsById = new Map((run.citations ?? []).map((c) => [c.id, c]));
   const gapsById = new Map((run.gaps ?? []).map((g) => [g.id, g]));
@@ -43,12 +44,12 @@ export function ProjectRunFocusView({
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
       <section className="space-y-4" aria-label="포커스 작업">
         <header className="border-border bg-surface rounded-xl border p-4">
-          {run.target?.company || run.target?.role ? (
+          {careerTarget ? (
             <p className="text-muted-foreground text-xs font-bold">목표 포지션</p>
           ) : null}
-          {run.target?.company || run.target?.role ? (
+          {careerTarget ? (
             <p className="mt-1 text-sm font-bold">
-              {[run.target.company, run.target.role].filter(Boolean).join(' · ')}
+              {[careerTarget.company, careerTarget.role].filter(Boolean).join(' · ')}
             </p>
           ) : null}
           <p className="text-muted-foreground mt-3 text-xs font-bold">현재 작업</p>

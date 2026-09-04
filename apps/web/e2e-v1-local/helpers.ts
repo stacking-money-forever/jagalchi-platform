@@ -1,0 +1,99 @@
+import { expect, type Page } from '@playwright/test';
+
+export function required(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is required for the no-MSW local E2E project`);
+  return value;
+}
+
+export async function expectNoServiceWorker(page: Page) {
+  const state = await page.evaluate(async () => ({
+    controlled: Boolean(navigator.serviceWorker?.controller),
+    registrations: navigator.serviceWorker
+      ? (await navigator.serviceWorker.getRegistrations()).length
+      : 0,
+  }));
+  expect(state).toEqual({ controlled: false, registrations: 0 });
+}
+
+export async function loginWithSeedUser(
+  page: Page,
+  email: string,
+  password: string,
+  userId: string,
+) {
+  await page.goto('/login');
+  await expectNoServiceWorker(page);
+
+  await page.getByPlaceholder('이메일 입력').fill(email);
+  await page.getByPlaceholder('비밀번호 입력').fill(password);
+  const loginResponse = page.waitForResponse(
+    (response) =>
+      response.url().endsWith('/api/users/auth/login') && response.request().method() === 'POST',
+  );
+  await page.getByRole('button', { name: '로그인', exact: true }).click();
+  const completedLogin = await loginResponse;
+  expect(completedLogin.status()).toBe(200);
+  expect((await completedLogin.json()).user.id).toBe(userId);
+  await expect(page).toHaveURL(/\/$/);
+}
+
+export type ProjectRunProjectionPayload = {
+  id: string;
+  currentTaskId: string | null;
+  recommendedTaskId: string | null;
+  milestones?: Array<{ id: string; title: string }>;
+  map: { nodes: Array<{ id: string; title: string; milestoneId: string | null; state: string }> };
+  tasks: Array<{
+    id: string;
+    title: string;
+    citationIds?: string[];
+    gapIds?: string[];
+    evidenceRequirements: string[];
+  }>;
+  citations?: Array<{ id: string; label: string; quote?: string }>;
+  gaps?: Array<{ id: string; description: string }>;
+  repositoryBinding?: {
+    repositoryName?: string | null;
+    pullNumber?: number | null;
+    headSha?: string | null;
+    pullUrl?: string | null;
+  };
+  proof: {
+    summary: string;
+    verification: { state: string };
+    publication: { state: string };
+    failedCriteria?: Array<{ ruleId: string; type: string; code: string }>;
+    facts?: {
+      snapshotId: string;
+      pullNumber: number;
+      headSha: string;
+      evaluations: Array<{ ruleId: string; passed: boolean; code: string }>;
+    };
+  } | null;
+};
+
+export async function fetchProjectRun(
+  page: Page,
+  projectRunId: string,
+): Promise<ProjectRunProjectionPayload> {
+  const runResponse = await page.request.get(`/api/project-runs/${projectRunId}`);
+  expect(runResponse.status()).toBe(200);
+  const projection = (await runResponse.json()) as ProjectRunProjectionPayload;
+  expect(projection.id).toBe(projectRunId);
+  return projection;
+}
+
+export async function openProjectRunWorkspace(page: Page, projectRunId: string) {
+  const pageResponse = await page.goto(`/projects/${projectRunId}`);
+  expect(pageResponse?.status()).toBe(200);
+  await expect(
+    page.getByRole('heading', { name: `프로젝트 실행 ${projectRunId.slice(0, 8)}` }),
+  ).toBeVisible();
+  await expectNoServiceWorker(page);
+}
+
+export async function selectWorkspaceTab(page: Page, label: '지도' | '포커스' | 'Proof') {
+  await page.getByRole('tab', { name: label }).click();
+  await expect(page.getByRole('tab', { name: label })).toHaveAttribute('aria-selected', 'true');
+}

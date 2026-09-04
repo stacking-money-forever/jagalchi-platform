@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import type { ProjectRunProjection } from '@jagalchi/api-client';
 
 import { adaptProjectRunProjection } from './adapt-projection';
-import type { ProjectRunProjectionEnvelope } from './projection-contract';
 
 const baseRun = {
   id: 'run-1',
@@ -78,8 +77,8 @@ describe('adaptProjectRunProjection', () => {
     expect(model.recommendedTaskId).toBe('rec-1');
   });
 
-  it('uses projection.milestones titles when BE provides them (G4)', () => {
-    const withTitles: ProjectRunProjectionEnvelope = {
+  it('uses projection.milestones titles when BE provides them', () => {
+    const withTitles: ProjectRunProjection = {
       ...baseRun,
       milestones: [{ id: 'm1', title: '인증 기반 구축' }],
     };

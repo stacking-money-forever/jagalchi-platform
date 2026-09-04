@@ -6,9 +6,14 @@ import { Button } from '@/components/ui/button';
 import { useProjectRunCommands } from '../hooks/use-project-run-commands';
 import { publicationLabelKo, verificationLabelKo } from '../projection';
 
-import type { ProjectRunProjectionEnvelope } from '../projection/projection-contract';
+import type { ProjectRunProjection } from '@jagalchi/api-client';
 
-export function ProjectRunProofView({ run }: { run: ProjectRunProjectionEnvelope }) {
+function formatSnapshotId(value: unknown): string | null {
+  if (typeof value === 'string' && value.length > 0) return value;
+  return null;
+}
+
+export function ProjectRunProofView({ run }: { run: ProjectRunProjection }) {
   const commands = useProjectRunCommands(run);
   const proof = run.proof;
   const binding = run.repositoryBinding;
@@ -90,9 +95,9 @@ export function ProjectRunProofView({ run }: { run: ProjectRunProjectionEnvelope
           {proof.validUntil ? (
             <span className="text-muted-foreground text-xs">유효 기한 {proof.validUntil}</span>
           ) : null}
-          {proof.publication.supersededSnapshotId ? (
+          {formatSnapshotId(proof.publication.supersededSnapshotId) ? (
             <span className="text-muted-foreground text-xs">
-              대체된 스냅샷 {proof.publication.supersededSnapshotId}
+              대체된 스냅샷 {formatSnapshotId(proof.publication.supersededSnapshotId)}
             </span>
           ) : null}
         </div>

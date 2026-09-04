@@ -868,6 +868,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/project-runs/{id}/pull-request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ProjectRunsController_bindPullRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/project-runs/{id}/reverify": {
         parameters: {
             query?: never;
@@ -1887,9 +1903,26 @@ export interface components {
         PublishProofDto: Record<string, never>;
         UnpublishProofDto: Record<string, never>;
         GithubInstallationClaimDto: Record<string, never>;
+        ProjectRunPlanReceiptDto: {
+            provider: string;
+            model: string;
+            promptVersion: string;
+            inputHash: string;
+            /** Format: date-time */
+            generatedAt: string;
+        };
+        ProjectRunPlanProvenanceDto: {
+            compileReceipt?: components["schemas"]["ProjectRunPlanReceiptDto"];
+            proposalReceipt?: components["schemas"]["ProjectRunPlanReceiptDto"];
+        };
         ProjectRunPlanDto: {
             id: string;
             schemaVersion: number;
+            provenance?: components["schemas"]["ProjectRunPlanProvenanceDto"];
+        };
+        ProjectRunMilestoneDto: {
+            id: string;
+            title: string;
         };
         ProjectRunMapNodeDto: {
             id: string;
@@ -1943,16 +1976,30 @@ export interface components {
             headSha: string | null;
             pullUrl: string | null;
         };
+        ProjectRunPendingOperationDto: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "TASK_VERIFICATION" | "PROOF_REVERIFICATION" | "PULL_REQUEST_BINDING";
+        };
         ProjectRunProofPublicationDto: {
             /** @enum {string} */
             state: "ACTIVE" | "UNPUBLISHED" | "INVALIDATED";
             publicId: string | null;
+            /** Format: uuid */
+            supersededSnapshotId?: Record<string, never> | null;
         };
         ProjectRunProofVerificationDto: {
             /** @enum {string} */
             state: "PENDING" | "PASS" | "FAIL" | "STALE";
             /** Format: date-time */
             verifiedAt: string | null;
+        };
+        ProjectRunProofFailedCriterionDto: {
+            ruleId: string;
+            /** @enum {string} */
+            type: "MERGED_PR" | "BASE_BRANCH" | "CHANGED_PATH" | "NAMED_CHECK";
+            code: string;
         };
         ProjectRunProofEvaluationDto: {
             ruleId: string;
@@ -1984,6 +2031,7 @@ export interface components {
             validUntil: string | null;
             publication: components["schemas"]["ProjectRunProofPublicationDto"];
             verification: components["schemas"]["ProjectRunProofVerificationDto"];
+            failedCriteria?: components["schemas"]["ProjectRunProofFailedCriterionDto"][];
             facts?: components["schemas"]["ProjectRunProofFactsDto"];
         };
         ProjectRunProjectionDto: {
@@ -1996,12 +2044,18 @@ export interface components {
             currentTaskId: string | null;
             recommendedTaskId: string | null;
             plan: components["schemas"]["ProjectRunPlanDto"];
+            milestones?: components["schemas"]["ProjectRunMilestoneDto"][];
             map: components["schemas"]["ProjectRunMapDto"];
             tasks: components["schemas"]["ProjectRunTaskDto"][];
             citations?: components["schemas"]["ProjectRunFocusCitationDto"][];
             gaps?: components["schemas"]["ProjectRunFocusGapDto"][];
             repositoryBinding?: components["schemas"]["ProjectRunRepositoryBindingDto"];
+            pendingOperation?: components["schemas"]["ProjectRunPendingOperationDto"];
             proof: components["schemas"]["ProjectRunProofDto"] | null;
+        };
+        BindProjectRunPullRequestDto: {
+            githubRepositoryId: string;
+            pullNumber: number;
         };
         RealtimeTicketResponseDto: {
             ticket: string;
@@ -3408,6 +3462,32 @@ export interface operations {
         requestBody?: never;
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProjectRunsController_bindPullRequest: {
+        parameters: {
+            query?: never;
+            header: {
+                "if-match": string;
+                "idempotency-key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BindProjectRunPullRequestDto"];
+            };
+        };
+        responses: {
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
