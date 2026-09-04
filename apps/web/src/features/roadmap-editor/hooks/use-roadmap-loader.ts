@@ -115,11 +115,15 @@ function replayDomainEvents(events: DomainRoadmapEvent[], initial: ApiRoadmap): 
 
 /** Load the authoritative UUID roadmap and replay its durable event log. */
 async function loadRoadmapData(roadmapId: string): Promise<ApiRoadmap> {
-  const { getEditableRoadmap, getRoadmapDomainEvents } = await import('@/api/roadmap-domain');
+  const { getEditableRoadmap, getRoadmapDomainEvents, isReadOnlyProjectRunRoadmap } =
+    await import('@/api/roadmap-domain');
   const [detail, eventResult] = await Promise.all([
     getEditableRoadmap(roadmapId),
     getRoadmapDomainEvents(roadmapId, 0),
   ]);
+  if (isReadOnlyProjectRunRoadmap(detail)) {
+    throw new Error('프로젝트 실행 전용 로드맵은 기존 편집기에서 열 수 없습니다.');
+  }
   return replayDomainEvents(eventResult.events, {
     title: detail.title,
     nodes: detail.graph.nodes,

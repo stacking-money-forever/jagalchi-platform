@@ -129,8 +129,15 @@ export const TEXT_COLOR_CLASSES: Record<TextColorVariant, string> = {
   orange: 'text-[#e17100]',
 } as const;
 
-export function getNodeColors(variant: NodeColorVariant, state: NodeState): NodeColorClasses {
-  return NODE_COLOR_CLASSES[variant][state];
+function isNodeColorVariant(value: unknown): value is NodeColorVariant {
+  return (
+    typeof value === 'string' && Object.prototype.hasOwnProperty.call(NODE_COLOR_CLASSES, value)
+  );
+}
+
+export function getNodeColors(variant: unknown, state: NodeState): NodeColorClasses {
+  const safeVariant = isNodeColorVariant(variant) ? variant : 'white';
+  return NODE_COLOR_CLASSES[safeVariant][state];
 }
 
 export function getTextColor(variant: TextColorVariant): string {

@@ -32,6 +32,12 @@ export interface RoadmapRecord {
   deletedAt: string | null;
 }
 
+const READ_ONLY_PROJECT_RUN_TAGS = ['project-run', 'local-seed'] as const;
+
+export function isReadOnlyProjectRunRoadmap(record: Pick<RoadmapRecord, 'tags'>): boolean {
+  return READ_ONLY_PROJECT_RUN_TAGS.some((tag) => record.tags.includes(tag));
+}
+
 export interface RoadmapDomainEvent {
   id: string;
   sequence: string;
