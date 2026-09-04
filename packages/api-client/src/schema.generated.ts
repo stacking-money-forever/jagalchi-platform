@@ -1924,7 +1924,24 @@ export interface components {
             purpose: string;
             acceptanceCriteria: string[];
             evidenceRequirements: string[];
+            citationIds?: string[];
+            gapIds?: string[];
             verificationFailure?: components["schemas"]["ProjectRunVerificationFailureDto"] | null;
+        };
+        ProjectRunFocusCitationDto: {
+            id: string;
+            label: string;
+            quote: string | null;
+        };
+        ProjectRunFocusGapDto: {
+            id: string;
+            description: string;
+        };
+        ProjectRunRepositoryBindingDto: {
+            repositoryName: string | null;
+            pullNumber: number | null;
+            headSha: string | null;
+            pullUrl: string | null;
         };
         ProjectRunProofPublicationDto: {
             /** @enum {string} */
@@ -1952,10 +1969,13 @@ export interface components {
             /** @enum {string} */
             provider: "fixture" | "github";
             repositoryId: string;
+            repositoryName?: string;
             pullNumber: number;
             headSha: string;
             /** Format: date-time */
             observedAt: string;
+            taskKey?: string | null;
+            pullUrl?: string | null;
             evaluations: components["schemas"]["ProjectRunProofEvaluationDto"][];
         };
         ProjectRunProofDto: {
@@ -1978,6 +1998,9 @@ export interface components {
             plan: components["schemas"]["ProjectRunPlanDto"];
             map: components["schemas"]["ProjectRunMapDto"];
             tasks: components["schemas"]["ProjectRunTaskDto"][];
+            citations?: components["schemas"]["ProjectRunFocusCitationDto"][];
+            gaps?: components["schemas"]["ProjectRunFocusGapDto"][];
+            repositoryBinding?: components["schemas"]["ProjectRunRepositoryBindingDto"];
             proof: components["schemas"]["ProjectRunProofDto"] | null;
         };
         RealtimeTicketResponseDto: {

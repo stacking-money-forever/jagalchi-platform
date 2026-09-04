@@ -8,7 +8,7 @@ import {
 } from '@jagalchi/api-client';
 import { useQuery } from '@tanstack/react-query';
 
-import { ProjectRunFlowClient } from './project-run-flow.client';
+import { ProjectRunWorkspace } from './project-run-workspace';
 
 const transport = createApiTransport('/api', fetch);
 
@@ -26,7 +26,7 @@ export function ProjectRunLive({ initialRun }: { initialRun: ProjectRunProjectio
         <h1 className="text-3xl font-bold">프로젝트 실행 {data.id.slice(0, 8)}</h1>
         <span className="rounded-full border px-3 py-1 text-sm">{data.state}</span>
       </div>
-      <ProjectRunFlowClient run={data} />
+      <ProjectRunWorkspace run={data} />
     </section>
   );
 }

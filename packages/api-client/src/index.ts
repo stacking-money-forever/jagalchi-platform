@@ -56,9 +56,112 @@ export function createApiTransport(
           | undefined;
         throw new ApiResponseError(response.status, error?.code, error?.message);
       }
-      return (await response.json()) as T;
+      if (response.status === 204) {
+        return undefined as T;
+      }
+      const text = await response.text();
+      if (!text) {
+        return undefined as T;
+      }
+      return JSON.parse(text) as T;
     },
   };
+}
+
+export interface ProjectRunCommandHeaders {
+  ifMatch: string;
+  idempotencyKey: string;
+}
+
+async function postProjectRunCommand(
+  transport: ApiTransport,
+  path: string,
+  headers: ProjectRunCommandHeaders,
+): Promise<void> {
+  await transport.request<void>(path, {
+    method: 'POST',
+    headers: {
+      'if-match': headers.ifMatch,
+      'idempotency-key': headers.idempotencyKey,
+    },
+  });
+}
+
+function taskCommandPath(runId: string, taskId: string, action: string): string {
+  return `/project-runs/${encodeURIComponent(runId)}/tasks/${encodeURIComponent(taskId)}/${action}`;
+}
+
+function runCommandPath(runId: string, action: string): string {
+  return `/project-runs/${encodeURIComponent(runId)}/${action}`;
+}
+
+export function startProjectRunTask(
+  transport: ApiTransport,
+  runId: string,
+  taskId: string,
+  headers: ProjectRunCommandHeaders,
+): Promise<void> {
+  return postProjectRunCommand(transport, taskCommandPath(runId, taskId, 'start'), headers);
+}
+
+export function deferProjectRunTask(
+  transport: ApiTransport,
+  runId: string,
+  taskId: string,
+  headers: ProjectRunCommandHeaders,
+): Promise<void> {
+  return postProjectRunCommand(transport, taskCommandPath(runId, taskId, 'defer'), headers);
+}
+
+export function blockProjectRunTask(
+  transport: ApiTransport,
+  runId: string,
+  taskId: string,
+  headers: ProjectRunCommandHeaders,
+): Promise<void> {
+  return postProjectRunCommand(transport, taskCommandPath(runId, taskId, 'block'), headers);
+}
+
+export function resumeProjectRunTask(
+  transport: ApiTransport,
+  runId: string,
+  taskId: string,
+  headers: ProjectRunCommandHeaders,
+): Promise<void> {
+  return postProjectRunCommand(transport, taskCommandPath(runId, taskId, 'resume'), headers);
+}
+
+export function verifyProjectRunTask(
+  transport: ApiTransport,
+  runId: string,
+  taskId: string,
+  headers: ProjectRunCommandHeaders,
+): Promise<void> {
+  return postProjectRunCommand(transport, taskCommandPath(runId, taskId, 'verify'), headers);
+}
+
+export function publishProjectRun(
+  transport: ApiTransport,
+  runId: string,
+  headers: ProjectRunCommandHeaders,
+): Promise<void> {
+  return postProjectRunCommand(transport, runCommandPath(runId, 'publish'), headers);
+}
+
+export function unpublishProjectRun(
+  transport: ApiTransport,
+  runId: string,
+  headers: ProjectRunCommandHeaders,
+): Promise<void> {
+  return postProjectRunCommand(transport, runCommandPath(runId, 'unpublish'), headers);
+}
+
+export function reverifyProjectRun(
+  transport: ApiTransport,
+  runId: string,
+  headers: ProjectRunCommandHeaders,
+): Promise<void> {
+  return postProjectRunCommand(transport, runCommandPath(runId, 'reverify'), headers);
 }
 
 export function getProjectRun(

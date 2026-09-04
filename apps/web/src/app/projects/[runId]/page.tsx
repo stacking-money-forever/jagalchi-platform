@@ -33,7 +33,7 @@ async function ProjectRunFromParams({ params }: { params: Promise<{ runId: strin
 
 export default function ProjectRunPage({ params }: { params: Promise<{ runId: string }> }) {
   return (
-    <main className="mx-auto max-w-6xl p-6">
+    <main className="mx-auto flex min-h-dvh max-w-[1600px] flex-col p-6">
       <Suspense fallback={<ProjectRunSkeleton />}>
         <ProjectRunFromParams params={params} />
       </Suspense>
