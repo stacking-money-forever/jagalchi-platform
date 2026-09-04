@@ -319,7 +319,7 @@ function DetailRail({ task, onClose }: { task: RoadmapTask | null; onClose: () =
   }
   return (
     <aside
-      className="border-border bg-surface flex w-80 shrink-0 flex-col border-l"
+      className="border-border bg-surface absolute inset-0 z-20 flex h-full min-h-0 w-full flex-col border-t shadow-lg lg:static lg:inset-auto lg:z-auto lg:h-auto lg:w-80 lg:shrink-0 lg:border-t-0 lg:border-l lg:shadow-none"
       aria-label={`작업 상세: ${task.title}`}
       data-exemplar-detail-rail
     >
@@ -512,7 +512,7 @@ export function RoadmapMapCanvas({
     typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   return (
-    <div className="flex h-full min-h-0 w-full">
+    <div className="relative flex h-full min-h-0 w-full">
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="border-border bg-surface flex flex-wrap items-center gap-2 border-b p-3">
           <h2 className="mr-2 text-sm font-bold">실행 로드맵 지도</h2>
