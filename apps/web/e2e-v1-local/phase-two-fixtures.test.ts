@@ -5,7 +5,10 @@ import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { reuseSeedAuthSession } from './auth-bootstrap';
-import { persistWorkerSeedAuthStorage } from './phase-two-fixtures';
+import {
+  persistWorkerSeedAuthStorage,
+  persistWorkerSeedAuthStorageIfHealthy,
+} from './phase-two-fixtures';
 
 function createHealthySeedAuthPage() {
   const cookies = vi.fn().mockResolvedValue([{ name: 'jagalchi-session', value: '1' }]);
@@ -60,6 +63,38 @@ function createStaleStorageSeedAuthPage(generation: number) {
       cookies,
       storageState: vi.fn().mockResolvedValue(undefined),
     }),
+  };
+}
+
+function createHandoffContext({
+  probeStatus,
+  hasSessionHint,
+  storageState,
+}: {
+  probeStatus: number;
+  hasSessionHint: boolean;
+  storageState: (options: { path: string }) => Promise<void>;
+}) {
+  const probePage = {
+    request: {
+      get: vi.fn().mockResolvedValue({
+        status: () => probeStatus,
+        ok: () => probeStatus === 200,
+      }),
+    },
+    close: vi.fn().mockResolvedValue(undefined),
+  };
+  const cookies = vi
+    .fn()
+    .mockResolvedValue(hasSessionHint ? [{ name: 'jagalchi-session', value: '1' }] : []);
+
+  return {
+    context: {
+      newPage: vi.fn().mockResolvedValue(probePage),
+      cookies,
+      storageState: vi.fn().mockImplementation(storageState),
+    },
+    probePage,
   };
 }
 
@@ -119,82 +154,115 @@ describe('phase-two fixture auth contract', () => {
     expect(storageState).toHaveBeenCalledWith({ path: storagePath });
   });
 
-  it('loads implicit BFF cookie rotation into the next isolated context without sessionMutated', async () => {
-    const storagePath = path.join(os.tmpdir(), `phase-two-implicit-rotation-${process.pid}.json`);
-    const initialRefresh = 'refresh-token-v1';
-    const rotatedRefresh = 'refresh-token-v2-bff-implicit';
+  it('hands healthy phase-one storage to the next map context', async () => {
+    const storagePath = path.join(os.tmpdir(), `phase-two-phase-one-map-${process.pid}.json`);
+    const rotatedRefresh = 'phase-one-refresh-rotated';
 
     await fs.writeFile(
       storagePath,
       JSON.stringify({
-        cookies: [
-          {
-            name: 'jagalchi_refresh',
-            value: initialRefresh,
-            domain: 'localhost',
-            path: '/',
-            expires: -1,
-            httpOnly: true,
-            secure: false,
-            sameSite: 'Lax',
-          },
-        ],
+        cookies: [{ name: 'jagalchi_refresh', value: 'phase-one-refresh-initial' }],
       }),
     );
 
-    const contextA = {
-      storageState: vi.fn().mockImplementation(async ({ path: outPath }: { path: string }) => {
+    const phaseOne = createHandoffContext({
+      probeStatus: 200,
+      hasSessionHint: true,
+      storageState: async ({ path: outPath }) => {
         await fs.writeFile(
           outPath,
           JSON.stringify({
-            cookies: [
-              {
-                name: 'jagalchi_refresh',
-                value: rotatedRefresh,
-                domain: 'localhost',
-                path: '/',
-                expires: -1,
-                httpOnly: true,
-                secure: false,
-                sameSite: 'Lax',
-              },
-            ],
+            cookies: [{ name: 'jagalchi_refresh', value: rotatedRefresh }],
           }),
         );
-      }),
-      close: vi.fn().mockResolvedValue(undefined),
-    };
+      },
+    });
+
+    try {
+      await expect(
+        persistWorkerSeedAuthStorageIfHealthy(phaseOne.context as never, storagePath),
+      ).resolves.toBe(true);
+      expect(phaseOne.probePage.close).toHaveBeenCalledOnce();
+
+      const mapStorage = JSON.parse(await fs.readFile(storagePath, 'utf8')) as {
+        cookies: Array<{ name: string; value: string }>;
+      };
+      expect(mapStorage.cookies[0]?.value).toBe(rotatedRefresh);
+
+      const mapPage = createHealthySeedAuthPage();
+      const result = await reuseSeedAuthSession(mapPage as never);
+      expect(result.sessionMutated).toBe(false);
+      expect(mapPage.request.patch).not.toHaveBeenCalled();
+    } finally {
+      await fs.rm(storagePath, { force: true });
+    }
+  });
+
+  it('persists implicit BFF cookie rotation after an entitled probe', async () => {
+    const storagePath = path.join(os.tmpdir(), `phase-two-implicit-rotation-${process.pid}.json`);
+    const rotatedRefresh = 'refresh-token-v2-bff-implicit';
 
     const pageA = createHealthySeedAuthPage();
     const resultA = await reuseSeedAuthSession(pageA as never);
     expect(resultA.sessionMutated).toBe(false);
 
-    await persistWorkerSeedAuthStorage(contextA as never, storagePath);
-    await contextA.close();
+    const contextA = createHandoffContext({
+      probeStatus: 200,
+      hasSessionHint: true,
+      storageState: async ({ path: outPath }) => {
+        await fs.writeFile(
+          outPath,
+          JSON.stringify({
+            cookies: [{ name: 'jagalchi_refresh', value: rotatedRefresh }],
+          }),
+        );
+      },
+    });
 
-    const persisted = JSON.parse(await fs.readFile(storagePath, 'utf8')) as {
-      cookies: Array<{ name: string; value: string }>;
-    };
-    expect(persisted.cookies.find((cookie) => cookie.name === 'jagalchi_refresh')?.value).toBe(
-      rotatedRefresh,
-    );
+    try {
+      await expect(
+        persistWorkerSeedAuthStorageIfHealthy(contextA.context as never, storagePath),
+      ).resolves.toBe(true);
 
-    const contextB = await (async () => {
-      const loaded = JSON.parse(await fs.readFile(storagePath, 'utf8')) as {
+      const persisted = JSON.parse(await fs.readFile(storagePath, 'utf8')) as {
         cookies: Array<{ name: string; value: string }>;
       };
-      expect(loaded.cookies.find((cookie) => cookie.name === 'jagalchi_refresh')?.value).toBe(
-        rotatedRefresh,
-      );
-      return { loadedFrom: storagePath };
-    })();
+      expect(persisted.cookies[0]?.value).toBe(rotatedRefresh);
+    } finally {
+      await fs.rm(storagePath, { force: true });
+    }
+  });
 
-    const pageB = createHealthySeedAuthPage();
-    const resultB = await reuseSeedAuthSession(pageB as never);
-    expect(resultB.sessionMutated).toBe(false);
-    expect(pageB.goto).not.toHaveBeenCalled();
-    expect(contextB.loadedFrom).toBe(storagePath);
+  it('does not poison healthy storage after an unauthenticated context', async () => {
+    const storagePath = path.join(os.tmpdir(), `phase-two-non-poisoning-${process.pid}.json`);
+    const healthyState = JSON.stringify({
+      cookies: [{ name: 'jagalchi_refresh', value: 'last-healthy-refresh' }],
+    });
+    await fs.writeFile(storagePath, healthyState);
 
-    await fs.rm(storagePath, { force: true });
+    const unauthenticated = createHandoffContext({
+      probeStatus: 200,
+      hasSessionHint: false,
+      storageState: vi.fn().mockResolvedValue(undefined),
+    });
+    const failed = createHandoffContext({
+      probeStatus: 401,
+      hasSessionHint: false,
+      storageState: vi.fn().mockResolvedValue(undefined),
+    });
+
+    try {
+      await expect(
+        persistWorkerSeedAuthStorageIfHealthy(unauthenticated.context as never, storagePath),
+      ).resolves.toBe(false);
+      await expect(
+        persistWorkerSeedAuthStorageIfHealthy(failed.context as never, storagePath),
+      ).resolves.toBe(false);
+      expect(unauthenticated.context.storageState).not.toHaveBeenCalled();
+      expect(failed.context.storageState).not.toHaveBeenCalled();
+      expect(await fs.readFile(storagePath, 'utf8')).toBe(healthyState);
+    } finally {
+      await fs.rm(storagePath, { force: true });
+    }
   });
 });

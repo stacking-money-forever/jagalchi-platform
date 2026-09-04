@@ -1,13 +1,12 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './phase-two-fixtures';
 
-import { ensureSeedAuthSession } from './auth-bootstrap';
-import { expectNoServiceWorker, required } from './helpers';
+import { ensureSeedSession, expectNoServiceWorker, required } from './helpers';
 
 const projectRunId = required('E2E_SEED_PROJECT_RUN_ID');
 const roadmapId = required('E2E_SEED_ROADMAP_ID');
 
 test('seeded user enters a real project run without MSW', async ({ page }) => {
-  await ensureSeedAuthSession(page);
+  await ensureSeedSession(page);
   await page.goto('/');
   await expectNoServiceWorker(page);
 

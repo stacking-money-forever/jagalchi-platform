@@ -1,11 +1,6 @@
-import path from 'node:path';
-
 import { defineConfig, devices } from '@playwright/test';
 
-import { defaultSeedAuthDir, resolveSeedAuthStoragePath } from './e2e-v1-local/auth-state';
-
 const baseURL = 'http://127.0.0.1:3100';
-const seedAuthStorageState = resolveSeedAuthStoragePath(defaultSeedAuthDir());
 // Infra browser gate always injects seed env; never attach to a stale dev server on :3100.
 const reuseExistingWebServer = !process.env.E2E_SEED_PROJECT_RUN_ID && !process.env.CI;
 
@@ -32,9 +27,8 @@ export default defineConfig({
       name: 'chromium-no-msw',
       use: {
         ...devices['Desktop Chrome'],
-        storageState: seedAuthStorageState,
       },
-      // Optional: run setup-seed-auth first to reuse persisted storageState instead of worker login.
+      // Product specs use the shared worker-scoped auth handoff fixture.
       dependencies: ['setup-seed-auth'],
       testIgnore: [/auth\.setup\.ts/, /\.test\.ts$/, /phase-two-fixtures\.ts$/],
     },
