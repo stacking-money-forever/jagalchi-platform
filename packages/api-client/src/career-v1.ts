@@ -100,6 +100,10 @@ export interface VersionedCommandHeaders extends IdempotencyHeaders {
 
 export const FIXTURE_JOB_POSTING_URL = 'https://fixture.invalid/jobs/software-engineer';
 
+/** Deterministic manual-capture body aligned with API career-v1 citation fixtures. */
+export const FIXTURE_MANUAL_CAPTURE_SOURCE_TEXT =
+  'A manually captured backend role requiring TypeScript and reliable tests.';
+
 export const REPOSITORY_MODE_ORDER: readonly RepositoryMode[] = [
   'EXISTING_OWNED',
   'OPEN_SOURCE_CONTRIBUTION',

@@ -83,7 +83,7 @@ type WizardStep =
 
 const SUPPORTED_SOURCES = [
   '공개 채용 URL (fixture.invalid 포함 로컬 E2E)',
-  '수동 캡처 (자동 수집 실패 시)',
+  '수동 캡처 (URL 없이 본문 붙여넣기 또는 자동 수집 실패 시)',
 ];
 
 const DEFAULT_CONSTRAINTS = {
@@ -219,6 +219,7 @@ export function TargetEntryWizard() {
           setFailure(mapped);
           if (isManualCaptureSuggested(mapped.code)) {
             setShowManualCapture(true);
+            setStep('intake');
           }
           return;
         }
@@ -584,11 +585,15 @@ export function TargetEntryWizard() {
           ) : null}
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => void beginIntake()}>공고 가져오기</Button>
-            {isManualCaptureSuggested(failure?.code) || showManualCapture ? (
-              <Button variant="outline" onClick={() => setShowManualCapture(true)}>
-                수동 캡처 입력
-              </Button>
-            ) : null}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowManualCapture(true);
+                resetFailure();
+              }}
+            >
+              수동 캡처 입력
+            </Button>
           </div>
         </section>
       ) : null}

@@ -1,6 +1,13 @@
 import { expect, test } from '@playwright/test';
 
-import { expectNoServiceWorker, loginWithSeedUser, required } from './helpers';
+import { FIXTURE_MANUAL_CAPTURE_SOURCE_TEXT } from '@jagalchi/api-client';
+
+import {
+  completeWaveBWizardFromProfileReview,
+  loginWithSeedUser,
+  openWaveBTargetEntry,
+  required,
+} from './helpers';
 
 const email = required('E2E_TEST_EMAIL');
 const password = required('E2E_TEST_PASSWORD');
@@ -14,41 +21,49 @@ test.describe('Phase 2 Wave B target entry', () => {
   test('fixture intake can reach project run map', async ({ page }) => {
     test.setTimeout(300_000);
 
-    await page.goto('/projects/new');
-    await expectNoServiceWorker(page);
-    await expect(page.getByText('목표 공고 → 프로젝트 실행')).toBeVisible();
+    await openWaveBTargetEntry(page);
+    await page.getByRole('button', { name: '공고 가져오기' }).click();
+    await completeWaveBWizardFromProfileReview(page);
+  });
 
+  test('manual capture without original URL can reach project run map', async ({ page }) => {
+    test.setTimeout(300_000);
+
+    const workflowPolls: string[] = [];
+    page.on('response', (response) => {
+      if (
+        response.url().includes('/api/workflow-operations/') &&
+        response.request().method() === 'GET' &&
+        response.status() === 200
+      ) {
+        workflowPolls.push(response.url());
+      }
+    });
+
+    await openWaveBTargetEntry(page);
+
+    await page.getByRole('textbox').first().fill('');
+    await page.getByRole('button', { name: '수동 캡처 입력' }).click();
+    await page
+      .getByPlaceholder('자동 수집이 실패한 경우 공고 본문을 붙여넣어 주세요.')
+      .fill(FIXTURE_MANUAL_CAPTURE_SOURCE_TEXT);
+
+    const targetImportRequest = page.waitForRequest(
+      (request) =>
+        request.url().includes('/api/career/target-imports') && request.method() === 'POST',
+    );
     await page.getByRole('button', { name: '공고 가져오기' }).click();
 
-    await expect(page.getByRole('heading', { name: 'GitHub 증거 스냅샷 검토' })).toBeVisible({
-      timeout: 180_000,
-    });
-    await page.getByRole('button', { name: '증거 스냅샷 확인' }).click();
+    const request = await targetImportRequest;
+    const body = JSON.parse(request.postData() ?? '{}') as {
+      input?: { kind?: string; originalUrl?: string; url?: string; sourceText?: string };
+    };
+    expect(body.input?.kind).toBe('MANUAL_CAPTURE');
+    expect(body.input?.originalUrl).toBeUndefined();
+    expect(body.input?.url).toBeUndefined();
+    expect(body.input?.sourceText).toBe(FIXTURE_MANUAL_CAPTURE_SOURCE_TEXT);
 
-    await expect(page.getByRole('heading', { name: 'Career Diff 검토' })).toBeVisible({
-      timeout: 120_000,
-    });
-    await page.getByRole('button', { name: 'Career Diff 확인' }).click();
-
-    await expect(page.getByRole('button', { name: '이 제안 선택' }).first()).toBeVisible({
-      timeout: 180_000,
-    });
-    await page.getByRole('button', { name: '이 제안 선택' }).first().click();
-    await page.getByRole('button', { name: '저장소 연결로 계속' }).click();
-
-    const repoSelect = page.locator('select').first();
-    if (await repoSelect.isVisible()) {
-      const options = repoSelect.locator('option');
-      const optionCount = await options.count();
-      expect(optionCount).toBeGreaterThan(1);
-      await repoSelect.selectOption({ index: 1 });
-    }
-
-    await page.getByRole('button', { name: '범위 확인으로 계속' }).click();
-    await page.getByRole('button', { name: '프로젝트 실행 만들기' }).click();
-
-    await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/i, { timeout: 180_000 });
-    await expect(page.getByRole('tab', { name: '지도' })).toBeVisible();
-    await expectNoServiceWorker(page);
+    await completeWaveBWizardFromProfileReview(page);
+    expect(workflowPolls.length).toBeGreaterThan(0);
   });
 });
