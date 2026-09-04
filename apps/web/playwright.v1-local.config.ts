@@ -34,6 +34,7 @@ export default defineConfig({
       NEXT_PUBLIC_REALTIME_ENABLED: 'true',
       NEXT_PUBLIC_REALTIME_URL: 'http://127.0.0.1:8080',
       NEXT_PUBLIC_EVIDENCE_EXECUTION_ENABLED: 'true',
+      NEXT_PUBLIC_PROJECT_RUNS_ENABLED: 'true',
       NEXT_PUBLIC_PROOF_PROFILE_ENABLED: 'true',
       NEXT_PUBLIC_SITE_URL: baseURL,
     },
