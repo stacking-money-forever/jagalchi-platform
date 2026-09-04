@@ -702,7 +702,7 @@ export const smallRunFixture: RoadmapFixture = {
       acceptanceCriteria: ['생성 테스트', '형식 스냅샷'],
       evidenceCount: 2,
       outcome: '리포트 생성기',
-      blockedReason: '외부 폰트 라이선스 확인 전 — 오프라인 대기',
+      blockedReason: '외부 폰트 라이선스 확인 전, 오프라인 대기',
     },
     {
       id: 's3',

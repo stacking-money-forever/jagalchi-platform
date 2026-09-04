@@ -629,7 +629,7 @@ function MapExemplarCanvas({
             fitView
             fitViewOptions={{ padding: 0.15 }}
             proOptions={{ hideAttribution: true }}
-            aria-label="실행 로드맵 지도 — 방향키로 이동, Enter로 선택"
+            aria-label="실행 로드맵 지도: 방향키로 이동, Enter로 선택"
           >
             <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
             <Controls showInteractive={false} position="bottom-right" />
@@ -671,7 +671,7 @@ function LinearView({ fixture, pathTaskIds }: { fixture: RoadmapFixture; pathTas
   return (
     <div className="mx-auto w-full max-w-[390px] px-3 pb-8" data-exemplar-linear>
       <p className="bg-background/95 text-muted-foreground sticky top-0 z-10 -mx-3 px-3 py-2 text-[11px] font-bold backdrop-blur">
-        390px 선형 뷰 — 그래프와 동일한 데이터, 동일한 상태 규칙
+        390px 선형 뷰: 그래프와 동일한 데이터, 동일한 상태 규칙
       </p>
       {fixture.milestones.map((m) => {
         const tasks = fixture.tasks.filter((t) => t.milestoneId === m.id);
@@ -766,7 +766,7 @@ export default function RoadmapExemplarPage() {
   return (
     <main className="bg-background flex h-dvh flex-col" data-exemplar-root>
       <header className="border-border bg-surface flex flex-wrap items-center gap-2 border-b px-4 py-2.5">
-        <h1 className="text-sm font-bold">실행 로드맵 Map — 디자인 exemplar</h1>
+        <h1 className="text-sm font-bold">실행 로드맵 Map: 디자인 exemplar</h1>
         <span className="text-muted-foreground text-[11px]">
           승인용 프리셋 · 프로덕션 화면 아님
         </span>
