@@ -1,12 +1,11 @@
 'use client';
 
 /**
- * Map desktop exemplar — 1440px canvas + detail rail.
+ * Production Project Run map canvas.
  *
- * Design exemplar only. Lives outside production routes and mirrors
- * ProjectRunProjectionDto so the approved preset transfers into Phase 2.2.
- * No Toss or React Flow Pro assets/code: shadcn/ui primitives, Jagalchi
- * semantic tokens, @xyflow/react 12, @dagrejs/dagre.
+ * Implements the approved Phase 2.2 Map behavior with shadcn/ui primitives,
+ * Jagalchi semantic tokens, @xyflow/react 12, and @dagrejs/dagre. No Toss or
+ * React Flow Pro assets or code are used.
  *
  * Demonstrates (UI_REFERENCE_PACK Implementation gate):
  * - current-path highlight (ancestors -> anchor -> forward route -> Proof)
