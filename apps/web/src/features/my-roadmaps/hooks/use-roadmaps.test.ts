@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { sessionPresentAtom } from '@/lib/auth-atoms';
 import { createTestWrapper } from '@/test-utils';
 
+import type { RoadmapRecord } from '@/api/roadmap-domain';
+
 vi.mock('@/api/roadmap-domain', () => ({
   isReadOnlyProjectRunRoadmap: (record: { tags: string[] }) =>
     record.tags.includes('project-run') || record.tags.includes('local-seed'),
@@ -27,6 +29,27 @@ import { listOwnedRoadmaps } from '@/api/roadmap-domain';
 import { useRoadmaps } from './use-roadmaps';
 
 const wrapper = () => createTestWrapper([[sessionPresentAtom, true]] as const);
+
+function createRoadmapRecord(id: string, title: string, tags: string[] = []): RoadmapRecord {
+  return {
+    id,
+    ownerId: 'owner-1',
+    title,
+    description: '',
+    tags,
+    visibility: 'PRIVATE',
+    graph: { schemaVersion: 1, nodes: [], edges: [] },
+    directoryId: null,
+    forkedFromId: null,
+    forkCount: 0,
+    likeCount: 0,
+    favoriteCount: 0,
+    version: 1,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    deletedAt: null,
+  };
+}
 
 describe('useRoadmaps', () => {
   it('returns loading state initially', () => {
@@ -57,8 +80,8 @@ describe('useRoadmaps', () => {
   it('preserves the server total for a normal paginated response', async () => {
     vi.mocked(listOwnedRoadmaps).mockResolvedValueOnce({
       items: [
-        { id: 'page-roadmap-1', title: 'Page Roadmap 1', tags: [] },
-        { id: 'page-roadmap-2', title: 'Page Roadmap 2', tags: ['react'] },
+        createRoadmapRecord('page-roadmap-1', 'Page Roadmap 1'),
+        createRoadmapRecord('page-roadmap-2', 'Page Roadmap 2', ['react']),
       ],
       page: 2,
       size: 2,
