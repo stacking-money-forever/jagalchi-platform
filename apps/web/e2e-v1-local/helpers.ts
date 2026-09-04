@@ -219,7 +219,9 @@ export async function expectProofWorkspaceReady(
 
 export async function ensureSeedSession(page: Page): Promise<void> {
   const { reuseSeedAuthSession } = await import('./auth-bootstrap');
+  const { resolveSeedAuthStoragePath } = await import('./auth-state');
   await reuseSeedAuthSession(page);
+  await page.context().storageState({ path: resolveSeedAuthStoragePath() });
 }
 
 export async function prepareAuthenticatedTestPage(page: Page) {
@@ -242,10 +244,19 @@ export async function selectWaveBExistingRepository(
   repositoryLabel = WAVE_B_FIXTURE_REPOSITORY_LABEL,
 ) {
   await expect(page.getByRole('heading', { name: '저장소 연결' })).toBeVisible();
+  const existingOwnedMode = page.getByRole('button', { name: '기존 저장소' });
+  if (await existingOwnedMode.isVisible()) {
+    await existingOwnedMode.click();
+  }
+
   const repoSelect = page.getByLabel('GitHub 저장소');
   await expect(repoSelect).toBeVisible();
-  await expect(repoSelect.locator('option', { hasText: repositoryLabel })).toHaveCount(1);
+  const fixtureOption = repoSelect.locator('option', { hasText: repositoryLabel });
+  await expect(fixtureOption).toHaveCount(1);
+  const repositoryId = await fixtureOption.getAttribute('value');
+  expect(repositoryId, 'fixture repository option must expose a repository id').toBeTruthy();
   await repoSelect.selectOption({ label: repositoryLabel });
+  await expect(repoSelect).toHaveValue(repositoryId!);
 
   const continueButton = page.getByRole('button', { name: '범위 확인으로 계속' });
   await expect(continueButton).toBeEnabled();

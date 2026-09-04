@@ -72,10 +72,30 @@ export async function hydrateUiSession(page: Page): Promise<void> {
 export const SEED_AUTH_REUSE_ERROR =
   'seed auth must be established by setup-seed-auth or the worker fixture before tests run';
 
+async function recoverEntitledSeedSessionProbe(page: Page, projectRunId: string) {
+  let sessionProbe = await probeEntitledSeedSession(page, projectRunId);
+  assertProbeNotRateLimited(sessionProbe.status());
+  if (sessionProbe.status() === 200) {
+    return sessionProbe;
+  }
+
+  if (await refreshSessionHint(page)) {
+    sessionProbe = await probeEntitledSeedSession(page, projectRunId);
+    assertProbeNotRateLimited(sessionProbe.status());
+    if (sessionProbe.status() === 200) {
+      return sessionProbe;
+    }
+  }
+
+  await hydrateUiSession(page);
+  sessionProbe = await probeEntitledSeedSession(page, projectRunId);
+  assertProbeNotRateLimited(sessionProbe.status());
+  return sessionProbe;
+}
+
 export async function reuseSeedAuthSession(page: Page): Promise<void> {
   const projectRunId = required('E2E_SEED_PROJECT_RUN_ID');
-  const sessionProbe = await probeEntitledSeedSession(page, projectRunId);
-  assertProbeNotRateLimited(sessionProbe.status());
+  const sessionProbe = await recoverEntitledSeedSessionProbe(page, projectRunId);
 
   if (sessionProbe.status() !== 200) {
     throw new Error(SEED_AUTH_REUSE_ERROR);

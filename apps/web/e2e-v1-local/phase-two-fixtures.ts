@@ -3,7 +3,7 @@ import fs from 'node:fs';
 
 import { test as base, type BrowserContext } from '@playwright/test';
 
-import { ensureSeedAuthSession } from './auth-bootstrap';
+import { ensureSeedAuthSession, reuseSeedAuthSession } from './auth-bootstrap';
 import { resolveSeedAuthStoragePath } from './auth-state';
 
 type WorkerFixtures = {
@@ -14,13 +14,22 @@ export const test = base.extend<object, WorkerFixtures>({
   workerAuthContext: [
     async ({ browser }, use) => {
       const storagePath = resolveSeedAuthStoragePath();
+      const hasPersistedStorage = fs.existsSync(storagePath);
       const context = await browser.newContext(
-        fs.existsSync(storagePath) ? { storageState: storagePath } : undefined,
+        hasPersistedStorage ? { storageState: storagePath } : undefined,
       );
       const bootstrapPage = await context.newPage();
 
       try {
-        await ensureSeedAuthSession(bootstrapPage);
+        if (hasPersistedStorage) {
+          try {
+            await reuseSeedAuthSession(bootstrapPage);
+          } catch {
+            await ensureSeedAuthSession(bootstrapPage);
+          }
+        } else {
+          await ensureSeedAuthSession(bootstrapPage);
+        }
         await bootstrapPage.context().storageState({ path: storagePath });
       } finally {
         await bootstrapPage.close();
@@ -29,7 +38,7 @@ export const test = base.extend<object, WorkerFixtures>({
       await use(context);
       await context.close();
     },
-    { scope: 'worker' },
+    { scope: 'worker', timeout: 180_000 },
   ],
 
   context: async ({ workerAuthContext }, use) => {

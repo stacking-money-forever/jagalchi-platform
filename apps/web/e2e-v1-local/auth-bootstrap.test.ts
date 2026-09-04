@@ -62,13 +62,71 @@ describe('auth-bootstrap', () => {
   });
 
   it('refuses to log in when worker auth is missing during reuse', async () => {
+    let cookieChecks = 0;
     const page = {
       request: {
-        get: vi.fn().mockResolvedValue({ status: () => 401, ok: () => false }),
+        get: vi.fn().mockImplementation(async (url: string) => {
+          if (url.includes('csrf-token')) {
+            return {
+              ok: () => true,
+              status: () => 200,
+              json: async () => ({ token: 'csrf' }),
+            };
+          }
+          return { status: () => 401, ok: () => false };
+        }),
+        patch: vi.fn().mockResolvedValue({ status: () => 401, ok: () => false }),
       },
+      goto: vi.fn().mockResolvedValue(undefined),
+      context: () => ({
+        cookies: vi.fn().mockImplementation(async () => {
+          cookieChecks += 1;
+          return cookieChecks >= 2 ? [{ name: 'jagalchi-session', value: '1' }] : [];
+        }),
+      }),
     };
 
     await expect(reuseSeedAuthSession(page as never)).rejects.toThrow(SEED_AUTH_REUSE_ERROR);
+  });
+
+  it('recovers an entitled probe via refresh before failing reuse', async () => {
+    const page = {
+      request: {
+        get: vi.fn().mockImplementation(async (url: string) => {
+          if (url.includes('csrf-token')) {
+            return {
+              status: () => 200,
+              ok: () => true,
+              json: async () => ({ token: 'csrf' }),
+            };
+          }
+          if (url.includes('/api/project-runs/')) {
+            return {
+              status: () => 200,
+              ok: () => true,
+            };
+          }
+          return { status: () => 404, ok: () => false };
+        }),
+        patch: vi.fn().mockResolvedValue({ status: () => 200, ok: () => true }),
+      },
+      goto: vi.fn().mockResolvedValue(undefined),
+      context: () => ({
+        cookies: vi.fn().mockResolvedValue([{ name: 'jagalchi-session', value: '1' }]),
+      }),
+    };
+
+    const originalGet = page.request.get;
+    page.request.get = vi
+      .fn()
+      .mockResolvedValueOnce({ status: () => 401, ok: () => false })
+      .mockImplementation((url: string) => originalGet(url));
+
+    await reuseSeedAuthSession(page as never);
+
+    expect(page.request.get).toHaveBeenCalledTimes(4);
+    expect(page.request.patch).toHaveBeenCalledTimes(2);
+    expect(page.goto).not.toHaveBeenCalled();
   });
 
   it('hydrates the UI session hint when the API probe succeeds without a cookie', async () => {
