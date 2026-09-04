@@ -3,14 +3,15 @@ import { expect, test } from './phase-two-fixtures';
 import {
   expectFocusCitationLabel,
   expectFocusGapDescription,
+  expectFocusWorkspaceReady,
   expectProofVerificationState,
-  expectRepositoryBindingName,
+  expectProofWorkspaceReady,
+  expectProjectRunWorkspaceReady,
   fetchProjectRun,
   focusWorkspaceLocator,
   openProjectRunWorkspace,
   prepareAuthenticatedTestPage,
   proofFactsLocator,
-  repositoryBindingRegion,
   required,
   selectWorkspaceTab,
 } from './helpers';
@@ -64,9 +65,7 @@ test.describe('Phase 2 Wave A project run surfaces', () => {
 
     await openProjectRunWorkspace(page, projectRunId);
     await selectWorkspaceTab(page, '포커스');
-
-    await expect(page.locator('section[aria-label="포커스 작업"]')).toBeVisible();
-    await expect(page.getByRole('heading', { level: 2, name: anchorTask!.title })).toBeVisible();
+    await expectFocusWorkspaceReady(page, anchorTask!.title);
 
     const citationId = anchorTask!.citationIds?.[0];
     if (citationId) {
@@ -95,19 +94,9 @@ test.describe('Phase 2 Wave A project run surfaces', () => {
     const projection = await fetchProjectRun(page, projectRunId);
     await openProjectRunWorkspace(page, projectRunId);
     await selectWorkspaceTab(page, 'Proof');
-
-    await expect(repositoryBindingRegion(page)).toBeVisible();
-
-    if (projection.repositoryBinding?.repositoryName) {
-      await expectRepositoryBindingName(page, projection.repositoryBinding.repositoryName);
-    } else {
-      await expect(
-        repositoryBindingRegion(page).getByText('바인딩 정보가 없습니다.'),
-      ).toBeVisible();
-    }
+    await expectProofWorkspaceReady(page, projection);
 
     if (!projection.proof) {
-      await expect(page.getByText('Proof 데이터가 아직 없습니다.')).toBeVisible();
       return;
     }
 
@@ -148,15 +137,13 @@ test.describe('Phase 2 Wave A project run surfaces', () => {
 
     await openProjectRunWorkspace(page, projectRunId);
     await selectWorkspaceTab(page, '포커스');
-    await expect(page.getByRole('heading', { level: 2, name: anchorTask!.title })).toBeVisible();
+    await expectFocusWorkspaceReady(page, anchorTask!.title);
 
     await page.reload();
-    await expect(
-      page.getByRole('heading', { name: `프로젝트 실행 ${projectRunId.slice(0, 8)}` }),
-    ).toBeVisible();
+    await expectProjectRunWorkspaceReady(page, projectRunId);
 
     await selectWorkspaceTab(page, '포커스');
-    await expect(page.getByRole('heading', { level: 2, name: anchorTask!.title })).toBeVisible();
+    await expectFocusWorkspaceReady(page, anchorTask!.title);
     await expect(
       focusWorkspaceLocator(page).locator('header').getByText(anchorId!, { exact: true }),
     ).toBeVisible();

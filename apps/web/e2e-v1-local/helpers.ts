@@ -88,19 +88,37 @@ export async function fetchProjectRun(
   return projection;
 }
 
+export async function expectProjectRunWorkspaceReady(page: Page, projectRunId: string) {
+  await expect(
+    page.getByRole('heading', { name: `프로젝트 실행 ${projectRunId.slice(0, 8)}` }),
+  ).toBeVisible();
+  await expect(page.getByRole('tablist', { name: '실행 화면' })).toBeVisible();
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
+}
+
 export async function openProjectRunWorkspace(page: Page, projectRunId: string) {
   await ensureSeedSession(page);
   const pageResponse = await page.goto(`/projects/${projectRunId}`);
   expect(pageResponse?.status()).toBe(200);
-  await expect(
-    page.getByRole('heading', { name: `프로젝트 실행 ${projectRunId.slice(0, 8)}` }),
-  ).toBeVisible();
+  await expectProjectRunWorkspaceReady(page, projectRunId);
   await expectNoServiceWorker(page);
 }
 
 export async function selectWorkspaceTab(page: Page, label: '지도' | '포커스' | 'Proof') {
   await page.getByRole('tab', { name: label }).click();
   await expect(page.getByRole('tab', { name: label })).toHaveAttribute('aria-selected', 'true');
+
+  if (label === '지도') {
+    await expect(page.getByRole('heading', { name: '실행 로드맵 지도' })).toBeVisible();
+    return;
+  }
+
+  if (label === '포커스') {
+    await expect(focusWorkspaceLocator(page)).toBeVisible();
+    return;
+  }
+
+  await expect(repositoryBindingRegion(page)).toBeVisible();
 }
 
 export function repositoryBindingRegion(page: Page) {
@@ -119,18 +137,18 @@ export async function expectRepositoryBindingName(page: Page, repositoryName: st
 }
 
 export function focusWorkspaceLocator(page: Page) {
-  return page.locator('section[aria-label="포커스 작업"]');
+  return page.getByRole('region', { name: '포커스 작업' });
 }
 
 export function proofFactsLocator(page: Page) {
-  return page.locator('section[aria-label="Proof 사실"]');
+  return page.getByRole('region', { name: 'Proof 사실' });
 }
 
 export async function expectFocusCitationLabel(page: Page, label: string) {
   await expect(
     focusWorkspaceLocator(page)
-      .locator('section')
-      .filter({ has: page.getByRole('heading', { name: '인용된 채용 요구사항' }) })
+      .getByRole('heading', { name: '인용된 채용 요구사항' })
+      .locator('xpath=following-sibling::ul[1]')
       .getByText(label, { exact: true }),
   ).toBeVisible();
 }
@@ -138,10 +156,30 @@ export async function expectFocusCitationLabel(page: Page, label: string) {
 export async function expectFocusGapDescription(page: Page, description: string) {
   await expect(
     focusWorkspaceLocator(page)
-      .locator('section')
-      .filter({ has: page.getByRole('heading', { name: '커리어 갭' }) })
+      .getByRole('heading', { name: '커리어 갭' })
+      .locator('xpath=following-sibling::ul[1]')
       .getByText(description, { exact: true }),
   ).toBeVisible();
+}
+
+export async function expectFocusWorkspaceReady(page: Page, anchorTaskTitle: string) {
+  const focus = focusWorkspaceLocator(page);
+  await expect(focus).toBeVisible();
+  await expect(focus.getByRole('heading', { level: 2, name: anchorTaskTitle })).toBeVisible();
+}
+
+export async function expectProofSurfaceReady(
+  page: Page,
+  projection: Pick<ProjectRunProjectionPayload, 'proof'>,
+) {
+  await expect(repositoryBindingRegion(page)).toBeVisible();
+
+  if (!projection.proof) {
+    await expect(page.getByRole('status', { name: 'Proof 미수집' })).toBeVisible();
+    return;
+  }
+
+  await expect(proofFactsLocator(page)).toBeVisible();
 }
 
 export function verificationStateLabelKo(state: 'PENDING' | 'PASS' | 'FAIL' | 'STALE'): string {
@@ -164,6 +202,19 @@ export async function expectProofVerificationState(
   state: 'PENDING' | 'PASS' | 'FAIL' | 'STALE',
 ) {
   await expect(proofFactsLocator(page).getByText(verificationStateLabelKo(state))).toBeVisible();
+}
+
+export async function expectProofWorkspaceReady(
+  page: Page,
+  projection: Pick<ProjectRunProjectionPayload, 'proof' | 'repositoryBinding'>,
+) {
+  await expectProofSurfaceReady(page, projection);
+
+  if (projection.repositoryBinding?.repositoryName) {
+    await expectRepositoryBindingName(page, projection.repositoryBinding.repositoryName);
+  } else {
+    await expect(repositoryBindingRegion(page).getByText('바인딩 정보가 없습니다.')).toBeVisible();
+  }
 }
 
 export async function ensureSeedSession(page: Page): Promise<void> {

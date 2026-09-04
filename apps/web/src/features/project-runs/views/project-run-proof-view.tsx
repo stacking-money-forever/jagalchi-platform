@@ -47,7 +47,11 @@ export function ProjectRunProofView({ run }: { run: ProjectRunProjection }) {
         </section>
       ) : null}
 
-      <section aria-label="저장소 바인딩" className="border-border rounded-xl border p-4">
+      <section
+        role="region"
+        aria-label="저장소 바인딩"
+        className="border-border rounded-xl border p-4"
+      >
         <h2 className="text-sm font-bold">저장소 바인딩</h2>
         {repositoryDisplayName ? (
           <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
@@ -94,12 +98,16 @@ export function ProjectRunProofView({ run }: { run: ProjectRunProjection }) {
       </section>
 
       {!proof ? (
-        <p className="text-muted-foreground text-sm" role="status">
+        <p className="text-muted-foreground text-sm" role="status" aria-label="Proof 미수집">
           Proof 데이터가 아직 없습니다.
         </p>
       ) : (
         <>
-          <section aria-label="Proof 사실" className="border-border rounded-xl border p-4">
+          <section
+            role="region"
+            aria-label="Proof 사실"
+            className="border-border rounded-xl border p-4"
+          >
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-sm font-bold">검증·발행 상태</h2>
               <Badge variant="subtle" intent="neutral">

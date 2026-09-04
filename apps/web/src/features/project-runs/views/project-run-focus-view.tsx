@@ -42,7 +42,7 @@ export function ProjectRunFocusView({
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <section className="space-y-4" aria-label="포커스 작업">
+      <section role="region" aria-label="포커스 작업" className="space-y-4">
         <header className="border-border bg-surface rounded-xl border p-4">
           {careerTarget ? (
             <p className="text-muted-foreground text-xs font-bold">목표 포지션</p>
