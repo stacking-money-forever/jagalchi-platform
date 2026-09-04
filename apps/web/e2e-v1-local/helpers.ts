@@ -220,8 +220,10 @@ export async function expectProofWorkspaceReady(
 export async function ensureSeedSession(page: Page): Promise<void> {
   const { reuseSeedAuthSession } = await import('./auth-bootstrap');
   const { persistSeedAuthStorage } = await import('./seed-auth-storage');
-  await reuseSeedAuthSession(page);
-  await persistSeedAuthStorage(page);
+  const { sessionMutated } = await reuseSeedAuthSession(page);
+  if (sessionMutated) {
+    await persistSeedAuthStorage(page);
+  }
 }
 
 export async function prepareAuthenticatedTestPage(page: Page) {

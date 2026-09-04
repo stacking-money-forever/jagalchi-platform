@@ -48,69 +48,90 @@ async function refreshSessionHint(page: Page): Promise<boolean> {
   return refreshResponse.ok() && (await hasUiSessionCookie(page));
 }
 
-export async function hydrateUiSession(page: Page): Promise<void> {
+/** @returns true when refresh or navigation established the UI session hint cookie */
+export async function hydrateUiSession(page: Page): Promise<boolean> {
   if (await hasUiSessionCookie(page)) {
-    return;
+    return false;
   }
 
   if (await refreshSessionHint(page)) {
-    return;
+    return true;
   }
 
   await page.goto('/');
   if (await hasUiSessionCookie(page)) {
-    return;
+    return true;
   }
 
   if (await refreshSessionHint(page)) {
-    return;
+    return true;
   }
 
   await expect.poll(async () => hasUiSessionCookie(page), { timeout: 10_000 }).toBe(true);
+  return true;
 }
 
 export const SEED_AUTH_REUSE_ERROR =
   'seed auth must be established by setup-seed-auth or the worker fixture before tests run';
 
-async function recoverEntitledSeedSessionProbe(page: Page, projectRunId: string) {
+export type ReuseSeedAuthSessionResult = {
+  /** True when refresh/hydration rotated cookies — caller must persist storageState for later contexts */
+  sessionMutated: boolean;
+};
+
+async function recoverEntitledSeedSessionProbe(
+  page: Page,
+  projectRunId: string,
+): Promise<{
+  sessionProbe: Awaited<ReturnType<typeof probeEntitledSeedSession>>;
+  sessionMutated: boolean;
+}> {
+  let sessionMutated = false;
   let sessionProbe = await probeEntitledSeedSession(page, projectRunId);
   assertProbeNotRateLimited(sessionProbe.status());
   if (sessionProbe.status() === 200) {
-    return sessionProbe;
+    return { sessionProbe, sessionMutated };
   }
 
   if (await refreshSessionHint(page)) {
+    sessionMutated = true;
     sessionProbe = await probeEntitledSeedSession(page, projectRunId);
     assertProbeNotRateLimited(sessionProbe.status());
     if (sessionProbe.status() === 200) {
-      return sessionProbe;
+      return { sessionProbe, sessionMutated };
     }
   }
 
-  await hydrateUiSession(page);
+  if (await hydrateUiSession(page)) {
+    sessionMutated = true;
+  }
   sessionProbe = await probeEntitledSeedSession(page, projectRunId);
   assertProbeNotRateLimited(sessionProbe.status());
-  return sessionProbe;
+  return { sessionProbe, sessionMutated };
 }
 
-export async function reuseSeedAuthSession(page: Page): Promise<void> {
+export async function reuseSeedAuthSession(page: Page): Promise<ReuseSeedAuthSessionResult> {
   const projectRunId = required('E2E_SEED_PROJECT_RUN_ID');
-  const sessionProbe = await recoverEntitledSeedSessionProbe(page, projectRunId);
+  const { sessionProbe, sessionMutated: recovered } = await recoverEntitledSeedSessionProbe(
+    page,
+    projectRunId,
+  );
 
   if (sessionProbe.status() !== 200) {
     throw new Error(SEED_AUTH_REUSE_ERROR);
   }
 
+  let sessionMutated = recovered;
   if (!(await hasUiSessionCookie(page))) {
-    await hydrateUiSession(page);
-  } else {
-    await refreshSessionHint(page);
+    sessionMutated = (await hydrateUiSession(page)) || sessionMutated;
   }
 
   expect(
     await hasUiSessionCookie(page),
     'seed session hint cookie must be present when reusing worker auth',
   ).toBe(true);
+
+  return { sessionMutated };
 }
 
 export async function ensureSeedAuthSession(page: Page): Promise<void> {

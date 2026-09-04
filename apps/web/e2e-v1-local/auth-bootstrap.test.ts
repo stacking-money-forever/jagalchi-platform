@@ -54,10 +54,11 @@ describe('auth-bootstrap', () => {
       }),
     };
 
-    await reuseSeedAuthSession(page as never);
+    const result = await reuseSeedAuthSession(page as never);
 
-    expect(page.request.get).toHaveBeenCalledTimes(2);
-    expect(page.request.patch).toHaveBeenCalledTimes(1);
+    expect(result.sessionMutated).toBe(false);
+    expect(page.request.get).toHaveBeenCalledTimes(1);
+    expect(page.request.patch).not.toHaveBeenCalled();
     expect(page.goto).not.toHaveBeenCalled();
   });
 
@@ -122,10 +123,11 @@ describe('auth-bootstrap', () => {
       .mockResolvedValueOnce({ status: () => 401, ok: () => false })
       .mockImplementation((url: string) => originalGet(url));
 
-    await reuseSeedAuthSession(page as never);
+    const result = await reuseSeedAuthSession(page as never);
 
-    expect(page.request.get).toHaveBeenCalledTimes(4);
-    expect(page.request.patch).toHaveBeenCalledTimes(2);
+    expect(result.sessionMutated).toBe(true);
+    expect(page.request.get).toHaveBeenCalledTimes(3);
+    expect(page.request.patch).toHaveBeenCalledTimes(1);
     expect(page.goto).not.toHaveBeenCalled();
   });
 
