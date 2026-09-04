@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 import { updateEditableRoadmap } from '@/api/roadmap-domain';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -30,9 +30,60 @@ export function useAutoSave({
   const prevNodesRef = useRef<string>('');
   const prevEdgesRef = useRef<string>('');
   const prevTitleRef = useRef<string>('');
-  const debouncedNodes = useDebounce(nodes, 500);
-  const debouncedEdges = useDebounce(edges, 500);
-  const debouncedTitle = useDebounce(title, 500);
+  const activeRoadmapIdRef = useRef<string | null>(null);
+  const wasEnabledRef = useRef(false);
+  const pendingBaselineRef = useRef(false);
+  const saveSessionRef = useRef(0);
+  const debouncedValues = useDebounce(
+    useMemo(() => ({ nodes, edges, title }), [nodes, edges, title]),
+    500,
+  );
+  const { nodes: debouncedNodes, edges: debouncedEdges, title: debouncedTitle } = debouncedValues;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const previousRoadmapId = activeRoadmapIdRef.current;
+    if (!roadmapId) {
+      if (wasEnabledRef.current) saveSessionRef.current += 1;
+      activeRoadmapIdRef.current = null;
+      wasEnabledRef.current = false;
+      pendingBaselineRef.current = false;
+      return;
+    }
+
+    const roadmapChanged = previousRoadmapId !== null && previousRoadmapId !== roadmapId;
+    activeRoadmapIdRef.current = roadmapId;
+
+    if (!isEnabled) {
+      if (wasEnabledRef.current) saveSessionRef.current += 1;
+      wasEnabledRef.current = false;
+      pendingBaselineRef.current = false;
+      return;
+    }
+
+    if (roadmapChanged) {
+      saveSessionRef.current += 1;
+      prevNodesRef.current = hashNodes(nodes);
+      prevEdgesRef.current = hashEdges(edges);
+      prevTitleRef.current = title;
+      pendingBaselineRef.current = true;
+      wasEnabledRef.current = false;
+      return;
+    }
+
+    if (!wasEnabledRef.current) {
+      if (previousRoadmapId !== null) {
+        prevNodesRef.current = hashNodes(nodes);
+        prevEdgesRef.current = hashEdges(edges);
+        prevTitleRef.current = title;
+        pendingBaselineRef.current = true;
+        wasEnabledRef.current = true;
+        return;
+      }
+      wasEnabledRef.current = true;
+    }
+  }, [roadmapId, isEnabled, nodes, edges, title]);
 
   useEffect(() => {
     if (!isEnabled || typeof window === 'undefined' || !roadmapId) return;
@@ -40,6 +91,19 @@ export function useAutoSave({
     const currentNodesHash = hashNodes(debouncedNodes);
     const currentEdgesHash = hashEdges(debouncedEdges);
     const currentTitle = debouncedTitle;
+
+    if (pendingBaselineRef.current) {
+      if (
+        currentNodesHash === prevNodesRef.current &&
+        currentEdgesHash === prevEdgesRef.current &&
+        currentTitle === prevTitleRef.current
+      ) {
+        pendingBaselineRef.current = false;
+        wasEnabledRef.current = true;
+      }
+      return;
+    }
+
     const nodesChanged = currentNodesHash !== prevNodesRef.current;
     const edgesChanged = currentEdgesHash !== prevEdgesRef.current;
     const titleChanged = currentTitle !== prevTitleRef.current;
@@ -54,6 +118,7 @@ export function useAutoSave({
       });
     }
 
+    const saveSession = saveSessionRef.current;
     void updateEditableRoadmap(roadmapId, {
       title: debouncedTitle,
       graph: {
@@ -63,6 +128,7 @@ export function useAutoSave({
       },
     })
       .then(() => {
+        if (saveSession !== saveSessionRef.current) return;
         prevNodesRef.current = currentNodesHash;
         prevEdgesRef.current = currentEdgesHash;
         prevTitleRef.current = currentTitle;

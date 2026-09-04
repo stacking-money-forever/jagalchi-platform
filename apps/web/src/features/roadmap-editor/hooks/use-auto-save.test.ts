@@ -1,14 +1,11 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => ({
   updateEditableRoadmap: vi.fn(async () => ({ id: 'roadmap-1' })),
 }));
 
 vi.mock('@/api/roadmap-domain', () => api);
-vi.mock('@/hooks/use-debounce', () => ({
-  useDebounce: <T>(value: T): T => value,
-}));
 
 import { useAutoSave } from './use-auto-save';
 
@@ -37,6 +34,10 @@ describe('useAutoSave', () => {
     api.updateEditableRoadmap.mockResolvedValue({ id: roadmapId });
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('persists the UUID roadmap graph through the Nest API', async () => {
     const nodes = [makeNode('n1', 'Node 1')];
     const edges = [makeEdge('e1', 'n1', 'n2')];
@@ -63,6 +64,64 @@ describe('useAutoSave', () => {
       }),
     );
     expect(api.updateEditableRoadmap).not.toHaveBeenCalled();
+  });
+
+  it('baselines loaded values before first enable and saves a later real edit', async () => {
+    vi.useFakeTimers();
+    const staleNodes = [makeNode('stale-node', 'Jagalchi Local Execution Roadmap')];
+    const loadedNodes = [makeNode('legacy-node', 'Visual QA Legacy Roadmap')];
+    const loadedEdges = [makeEdge('legacy-edge', 'legacy-node', 'next-node')];
+    const previousRoadmapId = '22222222-2222-4222-8222-222222222222';
+
+    const { rerender } = renderHook(
+      ({ currentRoadmapId, nodes, edges, title, enabled }) =>
+        useAutoSave({
+          roadmapId: currentRoadmapId,
+          nodes,
+          edges,
+          title,
+          isEnabled: enabled,
+        }),
+      {
+        initialProps: {
+          currentRoadmapId: previousRoadmapId,
+          nodes: staleNodes,
+          edges: [] as Edge[],
+          title: 'Jagalchi Local Execution Roadmap',
+          enabled: false,
+        },
+      },
+    );
+
+    rerender({
+      currentRoadmapId: roadmapId,
+      nodes: loadedNodes,
+      edges: loadedEdges,
+      title: 'Visual QA Legacy Roadmap',
+      enabled: true,
+    });
+    expect(api.updateEditableRoadmap).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(api.updateEditableRoadmap).not.toHaveBeenCalled();
+
+    const editedNodes = [makeNode('legacy-node', 'Edited Legacy Roadmap')];
+    rerender({
+      currentRoadmapId: roadmapId,
+      nodes: editedNodes,
+      edges: loadedEdges,
+      title: 'Edited Legacy Roadmap',
+      enabled: true,
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(api.updateEditableRoadmap).toHaveBeenCalledWith(roadmapId, {
+      title: 'Edited Legacy Roadmap',
+      graph: { schemaVersion: 1, nodes: editedNodes, edges: loadedEdges },
+    });
   });
 
   it('skips an identical rerender after the prior save commits', async () => {
