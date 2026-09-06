@@ -91,7 +91,14 @@ describe('ProjectRunProofView', () => {
                 pullNumber: 17,
                 headSha: 'a'.repeat(40),
                 observedAt: '2026-09-07T00:00:00Z',
-                evaluations: [],
+                evaluations: [
+                  {
+                    ruleId: 'task-1:rule-0',
+                    type: 'MERGED_PR',
+                    passed: true,
+                    code: 'PASS',
+                  },
+                ],
               },
             },
           } as ProjectRunProjection
@@ -105,5 +112,7 @@ describe('ProjectRunProofView', () => {
     expect(screen.getByRole('note', { name: '검증 출처 안내' })).toHaveTextContent(
       '실제 GitHub 검증 결과가 아닙니다.',
     );
+    expect(screen.getByRole('table', { name: '규칙별 결과' })).toBeVisible();
+    expect(screen.getByText('task-1:rule-0')).toBeVisible();
   });
 });

@@ -371,10 +371,13 @@ export function ProjectRunProofView({ run }: { run: ProjectRunProjection }) {
             )}
 
             {failedCriteria.length > 0 ? (
-              <div className="mt-4 overflow-x-auto">
+              <div className="mt-4">
                 <h3 className="text-sm font-bold">실패한 기준</h3>
-                <table className="mt-2 w-full text-left text-xs">
-                  <thead>
+                <table
+                  aria-label="실패한 기준"
+                  className="mt-2 block w-full text-left text-xs sm:table"
+                >
+                  <thead className="sr-only sm:table-header-group">
                     <tr className="border-border border-b">
                       <th className="p-2 font-bold">규칙</th>
                       <th className="p-2 font-bold">유형</th>
@@ -382,15 +385,48 @@ export function ProjectRunProofView({ run }: { run: ProjectRunProjection }) {
                       <th className="p-2 font-bold">근거</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="block space-y-2 sm:table-row-group sm:space-y-0">
                     {failedCriteria.map((evaluation) => {
                       const taskIds = taskIdsForRule(run, evaluation.ruleId);
                       return (
-                        <tr key={evaluation.ruleId} className="border-border border-b">
-                          <td className="p-2 font-mono">{evaluation.ruleId}</td>
-                          <td className="p-2">{evaluation.type}</td>
-                          <td className="p-2 font-mono">{evaluation.code}</td>
-                          <td className="p-2">
+                        <tr
+                          key={evaluation.ruleId}
+                          className="border-border grid grid-cols-2 gap-3 rounded-xl border p-3 sm:table-row sm:rounded-none sm:border-0 sm:border-b sm:p-0"
+                        >
+                          <td className="min-w-0 font-mono break-words sm:p-2">
+                            <span
+                              aria-hidden="true"
+                              className="text-muted-foreground mb-1 block font-sans sm:hidden"
+                            >
+                              규칙
+                            </span>
+                            {evaluation.ruleId}
+                          </td>
+                          <td className="min-w-0 sm:p-2">
+                            <span
+                              aria-hidden="true"
+                              className="text-muted-foreground mb-1 block sm:hidden"
+                            >
+                              유형
+                            </span>
+                            {evaluation.type}
+                          </td>
+                          <td className="min-w-0 font-mono break-words sm:p-2">
+                            <span
+                              aria-hidden="true"
+                              className="text-muted-foreground mb-1 block font-sans sm:hidden"
+                            >
+                              코드
+                            </span>
+                            {evaluation.code}
+                          </td>
+                          <td className="col-span-2 min-w-0 sm:table-cell sm:p-2">
+                            <span
+                              aria-hidden="true"
+                              className="text-muted-foreground mb-1 block sm:hidden"
+                            >
+                              근거
+                            </span>
                             <TaskRequirementLinks run={run} taskIds={taskIds} label="" />
                           </td>
                         </tr>
@@ -402,10 +438,13 @@ export function ProjectRunProofView({ run }: { run: ProjectRunProjection }) {
             ) : null}
 
             {facts && facts.evaluations && facts.evaluations.length > 0 ? (
-              <div className="mt-4 overflow-x-auto">
+              <div className="mt-4">
                 <h3 className="text-sm font-bold">규칙별 결과</h3>
-                <table className="mt-2 w-full text-left text-xs">
-                  <thead>
+                <table
+                  aria-label="규칙별 결과"
+                  className="mt-2 block w-full text-left text-xs sm:table"
+                >
+                  <thead className="sr-only sm:table-header-group">
                     <tr className="border-border border-b">
                       <th className="p-2 font-bold">규칙</th>
                       <th className="p-2 font-bold">유형</th>
@@ -414,14 +453,55 @@ export function ProjectRunProofView({ run }: { run: ProjectRunProjection }) {
                       <th className="p-2 font-bold">근거</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="block space-y-2 sm:table-row-group sm:space-y-0">
                     {facts.evaluations.map((evaluation) => (
-                      <tr key={evaluation.ruleId} className="border-border border-b">
-                        <td className="p-2 font-mono">{evaluation.ruleId}</td>
-                        <td className="p-2">{evaluation.type}</td>
-                        <td className="p-2">{evaluation.passed ? '통과' : '실패'}</td>
-                        <td className="p-2 font-mono">{evaluation.code}</td>
-                        <td className="p-2">
+                      <tr
+                        key={evaluation.ruleId}
+                        className="border-border grid grid-cols-2 gap-3 rounded-xl border p-3 sm:table-row sm:rounded-none sm:border-0 sm:border-b sm:p-0"
+                      >
+                        <td className="min-w-0 font-mono break-words sm:p-2">
+                          <span
+                            aria-hidden="true"
+                            className="text-muted-foreground mb-1 block font-sans sm:hidden"
+                          >
+                            규칙
+                          </span>
+                          {evaluation.ruleId}
+                        </td>
+                        <td className="min-w-0 sm:p-2">
+                          <span
+                            aria-hidden="true"
+                            className="text-muted-foreground mb-1 block sm:hidden"
+                          >
+                            유형
+                          </span>
+                          {evaluation.type}
+                        </td>
+                        <td className="min-w-0 sm:p-2">
+                          <span
+                            aria-hidden="true"
+                            className="text-muted-foreground mb-1 block sm:hidden"
+                          >
+                            결과
+                          </span>
+                          {evaluation.passed ? '통과' : '실패'}
+                        </td>
+                        <td className="min-w-0 font-mono break-words sm:p-2">
+                          <span
+                            aria-hidden="true"
+                            className="text-muted-foreground mb-1 block font-sans sm:hidden"
+                          >
+                            코드
+                          </span>
+                          {evaluation.code}
+                        </td>
+                        <td className="col-span-2 min-w-0 sm:table-cell sm:p-2">
+                          <span
+                            aria-hidden="true"
+                            className="text-muted-foreground mb-1 block sm:hidden"
+                          >
+                            근거
+                          </span>
                           <TaskRequirementLinks
                             run={run}
                             taskIds={taskIdsForRule(run, evaluation.ruleId)}
