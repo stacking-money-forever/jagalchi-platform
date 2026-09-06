@@ -446,7 +446,7 @@ test.describe('phase2-closure:complete-journey', () => {
         .poll(async () => (await projection(page, runId())).proof?.publication.state)
         .toBe('UNPUBLISHED');
       await expect(page.getByText(/미발행/)).toBeVisible();
-      await postUiCommand(page, `/publish`, '발행', 201);
+      await postUiCommand(page, `/publish`, '발행', 200);
       await expect
         .poll(async () => (await projection(page, runId())).proof?.publication.state)
         .toBe('ACTIVE');
