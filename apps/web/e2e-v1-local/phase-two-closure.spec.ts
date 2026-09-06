@@ -129,7 +129,11 @@ async function selectExplicitTheme(page: Page, theme: 'light' | 'dark') {
   for (let attempt = 0; attempt < 4; attempt += 1) {
     const selected = page.getByRole('button', { name: expectedName });
     if (await selected.count()) return;
-    await page.getByRole('button', { name: /모드 사용 중/ }).click();
+    const currentTheme = page.getByRole('button', {
+      name: /^(?:라이트 모드|다크 모드|시스템 설정) 사용 중\./,
+    });
+    await expect(currentTheme).toBeVisible({ timeout: 10_000 });
+    await currentTheme.click();
   }
   throw new Error(`Unable to select explicit ${theme} theme`);
 }
