@@ -26,7 +26,9 @@ export NEXT_PUBLIC_REALTIME_URL=http://127.0.0.1:8080
 export NEXT_PUBLIC_EVIDENCE_EXECUTION_ENABLED=true
 export NEXT_PUBLIC_PROJECT_RUNS_ENABLED=true
 export NEXT_PUBLIC_PROOF_PROFILE_ENABLED=true
-export NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3100
+export E2E_WEB_PORT="${E2E_WEB_PORT:-3100}"
+export E2E_BASE_URL="${E2E_BASE_URL:-http://127.0.0.1:$E2E_WEB_PORT}"
+export NEXT_PUBLIC_SITE_URL="$E2E_BASE_URL"
 
 pnpm --dir "$repo_root/apps/web" build
 exec pnpm --dir "$repo_root/apps/web" exec playwright test --config playwright.v1-local.config.ts

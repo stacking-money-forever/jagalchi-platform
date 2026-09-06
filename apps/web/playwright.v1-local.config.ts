@@ -1,7 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const baseURL = 'http://127.0.0.1:3100';
-// Infra browser gate always injects seed env; never attach to a stale dev server on :3100.
+const webPort = Number(process.env.E2E_WEB_PORT ?? '3100');
+if (!Number.isInteger(webPort) || webPort < 1024 || webPort > 65535) {
+  throw new Error('E2E_WEB_PORT must be an integer between 1024 and 65535');
+}
+const baseURL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${webPort}`;
+// Infra browser gate always injects seed env; never attach to an existing dev server.
 const reuseExistingWebServer = !process.env.E2E_SEED_PROJECT_RUN_ID && !process.env.CI;
 
 export default defineConfig({
@@ -35,7 +39,7 @@ export default defineConfig({
   ],
   webServer: {
     // Wave B `/projects/new` bakes feature flags at build time; start alone is not enough.
-    command: 'pnpm build && pnpm start --hostname 127.0.0.1 --port 3100',
+    command: `pnpm build && pnpm start --hostname 127.0.0.1 --port ${webPort}`,
     cwd: import.meta.dirname,
     env: {
       API_ORIGIN: 'http://127.0.0.1:8080',
