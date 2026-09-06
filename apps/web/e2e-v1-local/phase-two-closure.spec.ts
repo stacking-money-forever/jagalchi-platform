@@ -410,13 +410,9 @@ test.describe('phase2-closure:complete-journey', () => {
       await selectWorkspaceTab(page, '포커스');
       await expect(page.getByRole('heading', { name: '검증 실패' })).toBeVisible();
       await expect(page.getByText('VERIFICATION_FAILED')).toBeVisible();
-
-      await selectWorkspaceTab(page, 'Proof');
-      await bindFixturePullRequest(page, runId(), repositoryId, 42);
-      expect((await projection(page, runId())).repositoryBinding?.pullNumber).toBe(42);
     });
 
-    await test.step('phase2-closure:verify-polling-done-proof', async () => {
+    await test.step('phase2-closure:verification-retry-same-binding-done-proof', async () => {
       const verifyBody = await postUiCommand(page, `/tasks/${taskId}/verify`, '검증 요청', 202);
       expect(verifyBody).toBeTruthy();
       await expect
