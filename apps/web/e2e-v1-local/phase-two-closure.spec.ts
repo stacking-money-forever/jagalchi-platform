@@ -1,6 +1,7 @@
 import { FIXTURE_JOB_POSTING_URL } from '@jagalchi/api-client';
 import type { Page } from '@playwright/test';
 import { expect, test } from './phase-two-fixtures';
+import { ensureSeedAuthSession } from './auth-bootstrap';
 import {
   completeWaveBWizardFromProfileReview,
   ensureSeedSession,
@@ -344,7 +345,7 @@ test.describe('phase2-closure:complete-journey', () => {
       const freshContext = await browser.newContext({ serviceWorkers: 'block' });
       try {
         const rediscoveryPage = await freshContext.newPage();
-        await ensureSeedSession(rediscoveryPage);
+        await ensureSeedAuthSession(rediscoveryPage);
         await rediscoveryPage.goto('/myroadmap');
         const resumeLink = rediscoveryPage.locator(`a[href^="/projects/${createdRunId}"]`).first();
         await expect(resumeLink).toBeVisible();
