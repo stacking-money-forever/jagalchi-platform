@@ -40,7 +40,7 @@ fi
 
 grep -Fq "name: 'chromium-no-msw'" "$repo_root/apps/web/playwright.v1-local.config.ts"
 grep -Fq "serviceWorkers: 'block'" "$repo_root/apps/web/playwright.v1-local.config.ts"
-grep -Fq 'expect(completedLogin.status()).toBe(200)' "$repo_root/apps/web/e2e-v1-local/phase-one-entry.spec.ts"
+grep -Fq 'expect(completedLogin.status()).toBe(200)' "$repo_root/apps/web/e2e-v1-local/helpers.ts"
 
 for environment_file in \
   "$repo_root/scripts/dev-v1.sh" \

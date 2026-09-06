@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
-const expected = '1795500141cc96b14dba7324d00995c83c6fcb98efaa0e72eb84912b346664a2';
+const expected = '0f531485f7417b3f12b184d3344b4ee6c352f85c8828e0df0733dd127af6568f';
 const contract = new URL('../contract/openapi.json', import.meta.url);
 const actual = createHash('sha256').update(await readFile(contract)).digest('hex');
 if (actual !== expected) {

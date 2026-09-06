@@ -28,6 +28,11 @@ export const queryKeys = {
     popular: (params?: object) => [...queryKeys.roadmaps.all, 'popular', params] as const,
   },
 
+  projectRuns: {
+    all: ['project-runs'] as const,
+    lists: () => [...queryKeys.projectRuns.all, 'list'] as const,
+  },
+
   directories: {
     all: ['directories'] as const,
     tree: () => [...queryKeys.directories.all, 'tree'] as const,

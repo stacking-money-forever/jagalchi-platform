@@ -26,13 +26,14 @@ import {
   Handle,
   Position,
   ReactFlow,
-  useEdgesState,
   useNodesState,
   useReactFlow,
   type Edge,
   type EdgeProps,
   type Node,
+  type NodeChange,
   type NodeProps,
+  type Viewport,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
@@ -51,6 +52,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
+import {
+  readProjectRunPresentationState,
+  writeProjectRunPresentationState,
+} from '../../presentation-state';
 import {
   computeLayout,
   STATE_LABEL_KO,
@@ -109,6 +114,10 @@ function MilestoneNode({ data }: NodeProps<Node<RoadmapNodeData>>) {
             ? `${milestoneTitle} 펼치기 (${doneCount}/${totalCount} 완료)`
             : `${milestoneTitle} 접기 (${doneCount}/${totalCount} 완료)`
         }
+        onClick={(event) => {
+          event.stopPropagation();
+          data.onToggle?.(milestoneId);
+        }}
         className={cn('flex w-full items-center gap-2 px-4 text-left', compact ? 'h-10' : 'h-12')}
       >
         {collapsed ? (
@@ -191,15 +200,27 @@ function TaskNode({ data, selected }: NodeProps<Node<RoadmapNodeData>>) {
   const onPath = data.onPath === true;
   const zoomTier = data.zoomTier ?? 'task';
   const shellClass = cn(
-    'group relative flex h-full w-full flex-col justify-between rounded-lg border-2 px-3 py-2 text-left shadow-sm transition-shadow',
+    'group relative flex h-full w-full flex-col justify-between rounded-lg border-2 px-3 py-2 text-left shadow-sm',
     STATE_CLASS[task.state],
     selected && 'ring-ring/50 ring-offset-background ring-3 ring-offset-1',
     onPath && !selected && 'ring-ring/40 ring-2',
   );
+  const nodeA11y = {
+    id: `task-${task.id}`,
+    'data-task-id': task.id,
+    role: 'button' as const,
+    tabIndex: 0,
+    'aria-label': `${task.title} · ${STATE_LABEL_KO[task.state]} · ${task.required ? '필수' : '선택'}`,
+    onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      data.onSelect?.(task.id);
+    },
+  };
 
   if (zoomTier === 'overview') {
     return (
-      <div className={shellClass} data-zoom-tier="overview">
+      <div {...nodeA11y} className={shellClass} data-zoom-tier="overview">
         <Handle type="target" position={Position.Top} className="!invisible" />
         <div className="flex items-center gap-2">
           {STATE_ICON[task.state]}
@@ -214,7 +235,7 @@ function TaskNode({ data, selected }: NodeProps<Node<RoadmapNodeData>>) {
 
   if (zoomTier === 'evidence') {
     return (
-      <div className={shellClass} data-zoom-tier="evidence">
+      <div {...nodeA11y} className={shellClass} data-zoom-tier="evidence">
         <Handle type="target" position={Position.Top} className="!invisible" />
         <div className="flex items-start justify-between gap-2">
           <p className="line-clamp-1 min-w-0 text-xs font-bold" title={task.title}>
@@ -235,7 +256,7 @@ function TaskNode({ data, selected }: NodeProps<Node<RoadmapNodeData>>) {
   }
 
   return (
-    <div className={shellClass} data-zoom-tier="task">
+    <div {...nodeA11y} className={shellClass} data-zoom-tier="task">
       <Handle type="target" position={Position.Top} className="!invisible" />
       <div className="flex items-start justify-between gap-2">
         <p className="line-clamp-2 min-w-0 text-xs leading-4 font-bold" title={task.title}>
@@ -301,7 +322,15 @@ function RoadmapEdgeComponent({ sourceX, sourceY, targetX, targetY, data }: Edge
 
 const edgeTypes = { roadmap: RoadmapEdgeComponent };
 
-function DetailRail({ task, onClose }: { task: RoadmapTask | null; onClose: () => void }) {
+function DetailRail({
+  task,
+  onClose,
+  onOpenFocus,
+}: {
+  task: RoadmapTask | null;
+  onClose: () => void;
+  onOpenFocus?: (taskId: string) => void;
+}) {
   if (!task) {
     return (
       <aside
@@ -402,113 +431,185 @@ function DetailRail({ task, onClose }: { task: RoadmapTask | null; onClose: () =
             </p>
           ) : null}
         </section>
-      </div>
-      <div className="border-border border-t p-4">
-        <Button className="w-full" aria-label={`현재 작업 열기: ${task.title}`}>
+        <Button
+          className="w-full"
+          aria-label={`현재 작업 열기: ${task.title}`}
+          onClick={() => onOpenFocus?.(task.id)}
+        >
           현재 작업 열기
         </Button>
       </div>
     </aside>
   );
 }
-
 export function RoadmapMapCanvas({
   model,
   pathTaskIds,
+  selectedTaskId,
+  onTaskSelect,
+  onOpenFocus,
 }: {
   model: RoadmapGraphModel;
   pathTaskIds: string[];
+  selectedTaskId?: string | null;
+  onTaskSelect?: (taskId: string | null) => void;
+  onOpenFocus?: (taskId: string) => void;
 }) {
-  const [collapsedMilestones, setCollapsedMilestones] = useState<readonly string[]>([]);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(
-    model.currentTaskId ?? model.recommendedTaskId,
+  const planRevision = model.planRevision ?? `${model.runId}:unknown`;
+  const effectiveSelectedTaskId =
+    selectedTaskId === undefined
+      ? (model.currentTaskId ?? model.recommendedTaskId)
+      : selectedTaskId;
+  const presentationDefaults = useMemo(
+    () => ({
+      surface: 'map' as const,
+      collapsedMilestones: [] as string[],
+      selectedTaskId: effectiveSelectedTaskId,
+      search: '',
+      statusFilter: 'ALL' as const,
+    }),
+    [effectiveSelectedTaskId],
   );
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | TaskState>('ALL');
+  const [presentation, setPresentation] = useState(() =>
+    readProjectRunPresentationState(model.runId, planRevision, presentationDefaults),
+  );
+  const collapsedMilestones = presentation.collapsedMilestones;
+  const search = presentation.search;
+  const statusFilter = presentation.statusFilter;
   const [zoomTier, setZoomTier] = useState<ZoomTier>('overview');
   const { fitView, setViewport, getViewport } = useReactFlow();
 
+  useEffect(() => {
+    writeProjectRunPresentationState(model.runId, planRevision, {
+      ...presentation,
+      selectedTaskId: effectiveSelectedTaskId,
+    });
+  }, [effectiveSelectedTaskId, model.runId, planRevision, presentation]);
+
+  const toggleMilestone = useCallback((milestoneId: string) => {
+    setPresentation((previous) => ({
+      ...previous,
+      collapsedMilestones: previous.collapsedMilestones.includes(milestoneId)
+        ? previous.collapsedMilestones.filter((id) => id !== milestoneId)
+        : [...previous.collapsedMilestones, milestoneId],
+    }));
+  }, []);
+  const selectTask = useCallback((taskId: string) => onTaskSelect?.(taskId), [onTaskSelect]);
+
   const graph = useMemo(
-    () => computeLayout(model, pathTaskIds, collapsedMilestones),
-    [model, pathTaskIds, collapsedMilestones],
+    () => computeLayout(model, [], collapsedMilestones),
+    [model, collapsedMilestones],
+  );
+
+  const filteredTasks = useMemo(() => {
+    const q = search.trim().toLocaleLowerCase();
+    return model.tasks.filter((task) => {
+      const okState = statusFilter === 'ALL' || task.state === statusFilter;
+      const okSearch = q.length === 0 || task.title.toLocaleLowerCase().includes(q);
+      return okState && okSearch;
+    });
+  }, [model.tasks, search, statusFilter]);
+  const filteredTaskIds = useMemo(
+    () => new Set(filteredTasks.map((task) => task.id)),
+    [filteredTasks],
   );
 
   const { nodes: rfNodes, edges: rfEdges } = useMemo(() => {
-    const pathSet: Record<string, boolean> = {};
+    const pathSet: Record<string, boolean> = { proof: true };
     for (const id of pathTaskIds) pathSet[id] = true;
-    const nodes = graph.nodes.map((n) => ({
-      ...n,
+    const nodes = graph.nodes.map((node) => ({
+      ...node,
       draggable: false,
       className: 'nodrag',
-      selectable: n.type === 'task' || n.type === 'milestone',
+      hidden: node.type === 'task' && !filteredTaskIds.has(node.id),
+      selectable: node.type === 'task' || node.type === 'milestone',
       data: {
-        ...n.data,
+        ...node.data,
         zoomTier,
-        ...(n.type === 'proof' ? { proofState: model.proof } : {}),
-        ...(n.type === 'task' ? { onPath: pathSet[n.id] === true } : {}),
+        onToggle: toggleMilestone,
+        onSelect: selectTask,
+        ...(node.type === 'proof' ? { proofState: model.proof } : {}),
+        ...(node.type === 'task' ? { onPath: pathSet[node.id] === true } : {}),
       },
     }));
-    const edges = graph.edges.map((e) => ({
-      id: e.id,
-      source: e.source,
-      target: e.target,
+    const isHidden = (id: string) =>
+      model.tasks.some((task) => task.id === id) && !filteredTaskIds.has(id);
+    const edges = graph.edges.map((edge) => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
       type: 'roadmap' as const,
-      data: { onPath: pathSet[e.source] === true && pathSet[e.target] === true },
+      hidden: isHidden(edge.source) || isHidden(edge.target),
+      data: {
+        onPath:
+          pathSet[edge.source] === true &&
+          (pathSet[edge.target] === true || edge.target === 'proof'),
+      },
     }));
     return { nodes, edges };
-  }, [graph, pathTaskIds, zoomTier, model.proof]);
+  }, [
+    filteredTaskIds,
+    graph,
+    model.proof,
+    model.tasks,
+    pathTaskIds,
+    selectTask,
+    toggleMilestone,
+    zoomTier,
+  ]);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(rfNodes);
-  const [edges, , onEdgesChange] = useEdgesState<Edge>(rfEdges);
+  const [nodes, setNodes, applyNodesChange] = useNodesState<Node>(rfNodes);
 
   useEffect(() => {
     setNodes(rfNodes);
   }, [rfNodes, setNodes]);
 
-  const onViewportChange = useCallback((vp: { zoom: number }) => {
+  const readOnlyNodesChange = useCallback(
+    (changes: NodeChange<Node>[]) => {
+      applyNodesChange(changes.filter((change) => change.type === 'select'));
+    },
+    [applyNodesChange],
+  );
+
+  const onViewportChange = useCallback((vp: Viewport) => {
     setZoomTier(zoomTierFrom(vp));
+    setPresentation((previous) => ({ ...previous, viewport: vp }));
   }, []);
 
   const onInit = useCallback(() => {
     setZoomTier(zoomTierFrom(getViewport()));
   }, [getViewport]);
 
-  const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
-    if (node.type === 'task') {
-      setSelectedTaskId(node.id);
-    } else if (node.type === 'milestone') {
-      setCollapsedMilestones((prev) =>
-        prev.includes(node.id) ? prev.filter((id) => id !== node.id) : [...prev, node.id],
-      );
-    }
-  }, []);
-
-  const selectedTask = useMemo(
-    () => model.tasks.find((t) => t.id === selectedTaskId) ?? null,
-    [model, selectedTaskId],
+  const onNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      if (node.type === 'task') selectTask(node.id);
+      if (node.type === 'milestone') toggleMilestone(node.id);
+    },
+    [selectTask, toggleMilestone],
   );
 
-  const filteredTasks = useMemo(() => {
-    const q = search.trim();
-    return model.tasks.filter((t) => {
-      const okState = statusFilter === 'ALL' || t.state === statusFilter;
-      const okSearch = q.length === 0 || t.title.includes(q);
-      return okState && okSearch;
-    });
-  }, [model, search, statusFilter]);
+  const selectedTask = useMemo(
+    () => model.tasks.find((task) => task.id === effectiveSelectedTaskId) ?? null,
+    [effectiveSelectedTaskId, model.tasks],
+  );
 
   const focusCurrentTask = useCallback(() => {
     const anchorId = model.currentTaskId ?? model.recommendedTaskId;
     if (!anchorId) return;
-    const node = nodes.find((n) => n.id === anchorId);
+    const node = nodes.find((candidate) => candidate.id === anchorId);
     if (node) {
       setViewport({ x: -node.position.x + 480, y: -node.position.y + 240, zoom: 0.9 });
     }
-  }, [model, nodes, setViewport]);
+  }, [model.currentTaskId, model.recommendedTaskId, nodes, setViewport]);
 
   const tierLabel = tierLabelKo(zoomTier);
-  const motionSafe =
+  const reduceMotion =
     typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const fitViewOptions = useMemo(
+    () => ({ padding: 0.15, duration: reduceMotion ? 0 : 200 }),
+    [reduceMotion],
+  );
+  const proOptions = useMemo(() => ({ hideAttribution: true }), []);
 
   return (
     <div className="relative flex h-full min-h-0 w-full">
@@ -522,7 +623,9 @@ export function RoadmapMapCanvas({
             />
             <Input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(event) =>
+                setPresentation((previous) => ({ ...previous, search: event.target.value }))
+              }
               placeholder="작업 검색"
               aria-label="작업 검색"
               className="h-8 w-40 pl-7 text-xs"
@@ -530,14 +633,19 @@ export function RoadmapMapCanvas({
           </div>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as 'ALL' | TaskState)}
+            onChange={(event) =>
+              setPresentation((previous) => ({
+                ...previous,
+                statusFilter: event.target.value as 'ALL' | TaskState,
+              }))
+            }
             aria-label="상태 필터"
             className="border-border bg-surface h-8 rounded-md border px-2 text-xs font-bold"
           >
             <option value="ALL">전체 상태</option>
-            {(Object.keys(STATE_LABEL_KO) as TaskState[]).map((s) => (
-              <option key={s} value={s}>
-                {STATE_LABEL_KO[s]}
+            {(Object.keys(STATE_LABEL_KO) as TaskState[]).map((state) => (
+              <option key={state} value={state}>
+                {STATE_LABEL_KO[state]}
               </option>
             ))}
           </select>
@@ -548,7 +656,7 @@ export function RoadmapMapCanvas({
             variant="outline"
             size="sm"
             className="h-8 text-xs"
-            onClick={() => fitView({ duration: motionSafe ? 0 : 200 })}
+            onClick={() => fitView(fitViewOptions)}
           >
             전체 보기
           </Button>
@@ -564,7 +672,7 @@ export function RoadmapMapCanvas({
         >
           <ReactFlow
             nodes={nodes}
-            edges={edges}
+            edges={rfEdges}
             nodesDraggable={false}
             nodesConnectable={false}
             elementsSelectable
@@ -573,14 +681,15 @@ export function RoadmapMapCanvas({
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             onNodeClick={onNodeClick}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onMove={(_, vp) => onViewportChange(vp)}
-            onMoveEnd={(_, vp) => onViewportChange(vp)}
+            onNodesChange={readOnlyNodesChange}
+            onEdgesChange={() => undefined}
+            onMove={(_, viewport) => onViewportChange(viewport)}
+            onMoveEnd={(_, viewport) => onViewportChange(viewport)}
             onInit={onInit}
-            fitView
-            fitViewOptions={{ padding: 0.15 }}
-            proOptions={{ hideAttribution: true }}
+            fitView={!presentation.viewport}
+            defaultViewport={presentation.viewport}
+            fitViewOptions={fitViewOptions}
+            proOptions={proOptions}
             aria-label="실행 로드맵 지도: 방향키로 이동, Enter로 선택"
           >
             <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
@@ -603,7 +712,11 @@ export function RoadmapMapCanvas({
         </div>
       </div>
 
-      <DetailRail task={selectedTask} onClose={() => setSelectedTaskId(null)} />
+      <DetailRail
+        task={selectedTask}
+        onClose={() => onTaskSelect?.(null)}
+        onOpenFocus={onOpenFocus}
+      />
     </div>
   );
 }

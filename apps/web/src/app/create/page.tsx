@@ -14,6 +14,7 @@ export const metadata: Metadata = {
 
 export default function CreatePage() {
   const evidenceEnabled = isEnabled('EVIDENCE_EXECUTION_ENABLED');
+  const projectRunsEnabled = isEnabled('PROJECT_RUNS_ENABLED');
 
   return (
     <AppShell activeTab="create">
@@ -33,7 +34,7 @@ export default function CreatePage() {
             실행 계획 시작 방법
           </h2>
           <div className="grid gap-5 md:grid-cols-2">
-            {evidenceEnabled ? (
+            {evidenceEnabled && projectRunsEnabled ? (
               <Link
                 href="/projects/new"
                 className="group border-primary/30 bg-primary-subtle hover:border-primary/60 focus-visible:ring-ring flex min-h-80 flex-col rounded-3xl border p-6 transition-[transform,box-shadow,border-color] outline-none hover:-translate-y-0.5 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-offset-2 sm:p-8"

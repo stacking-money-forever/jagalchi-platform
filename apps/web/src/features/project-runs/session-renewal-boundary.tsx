@@ -47,7 +47,7 @@ export function ProjectRunSkeleton({
     <div
       aria-busy="true"
       aria-label={label}
-      className="mx-auto max-w-6xl animate-pulse space-y-4 p-6"
+      className="mx-auto max-w-6xl animate-pulse space-y-4 p-6 motion-reduce:animate-none"
     >
       <div className="bg-muted h-9 w-72 rounded" />
       <div className="bg-muted h-[420px] rounded-2xl" />

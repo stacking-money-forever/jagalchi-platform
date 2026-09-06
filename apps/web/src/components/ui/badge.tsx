@@ -10,7 +10,7 @@ export type BadgeVariant = 'solid' | 'subtle' | 'outline';
 export type BadgeSize = 'sm' | 'md' | 'lg';
 
 const badgeVariants = cva(
-  'inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded-full border font-bold transition-[background-color,border-color,color,box-shadow,opacity,transform] outline-none [&>svg]:pointer-events-none [a&]:active:scale-[0.98] [button&]:active:scale-[0.98] focus-visible:ring-3 focus-visible:ring-ring/40',
+  'inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded-full border font-bold transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] outline-none [&>svg]:pointer-events-none focus-visible:ring-3 focus-visible:ring-ring/40',
   {
     variants: {
       intent: {

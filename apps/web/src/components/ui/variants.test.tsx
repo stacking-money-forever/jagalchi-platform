@@ -45,6 +45,22 @@ describe('copy-owned primitive variants', () => {
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute('aria-busy', 'true');
     expect(button).toHaveAttribute('data-loading', 'true');
+    expect(button.querySelector('[aria-hidden="true"]')).toHaveClass('motion-reduce:animate-none');
+  });
+
+  it('keeps primitive motion bounded to compositor properties', () => {
+    render(
+      <>
+        <Button>실행</Button>
+        <Badge>상태</Badge>
+      </>,
+    );
+    const button = screen.getByRole('button', { name: '실행' });
+    const badge = screen.getByText('상태');
+    expect(button.className).toContain('transition-[opacity,transform]');
+    expect(badge.className).toContain('transition-[opacity,transform]');
+    expect(button.className).not.toContain('active:scale');
+    expect(badge.className).not.toContain('active:scale');
   });
 
   it('does not fire a disabled or loading button', () => {

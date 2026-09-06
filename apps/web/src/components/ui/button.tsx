@@ -11,7 +11,7 @@ export type ButtonVariant = 'solid' | 'outline' | 'ghost' | 'link';
 export type ButtonSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'icon' | 'icon-sm' | 'icon-lg';
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-bold transition-[background-color,border-color,color,box-shadow,opacity,transform] outline-none active:scale-[0.98] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-45 data-[loading=true]:cursor-wait [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/35",
+  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-bold transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-45 data-[loading=true]:cursor-wait [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/35",
   {
     variants: {
       intent: {
@@ -27,7 +27,7 @@ const buttonVariants = cva(
         solid: 'border border-transparent shadow-xs',
         outline: 'border bg-background shadow-xs dark:bg-input/30',
         ghost: 'border border-transparent shadow-none',
-        link: 'h-auto border-0 bg-transparent p-0 underline-offset-4 shadow-none hover:underline active:scale-100',
+        link: 'h-auto border-0 bg-transparent p-0 underline-offset-4 shadow-none hover:underline',
       },
       size: {
         xs: 'h-8 gap-1 rounded-lg px-2.5 text-xs has-[>svg]:px-2',
@@ -211,7 +211,7 @@ function Button({
       {loading ? (
         <span
           aria-hidden="true"
-          className="size-4 animate-spin rounded-full border-2 border-current border-r-transparent"
+          className="size-4 animate-spin rounded-full border-2 border-current border-r-transparent motion-reduce:animate-none"
         />
       ) : null}
       {loading && loadingLabel ? loadingLabel : children}

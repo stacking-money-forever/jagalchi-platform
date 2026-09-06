@@ -9,6 +9,7 @@ describe('resolveRepositoryDisplayName', () => {
     expect(
       resolveRepositoryDisplayName(
         {
+          githubRepositoryId: '9000001',
           repositoryName: 'fixture/verification-repository',
           pullNumber: 17,
           headSha: null,
@@ -22,7 +23,13 @@ describe('resolveRepositoryDisplayName', () => {
   it('falls back to proof facts when binding name is absent', () => {
     expect(
       resolveRepositoryDisplayName(
-        { repositoryName: null, pullNumber: null, headSha: null, pullUrl: null },
+        {
+          githubRepositoryId: '9000001',
+          repositoryName: null,
+          pullNumber: null,
+          headSha: null,
+          pullUrl: null,
+        },
         { repositoryName: 'fixture/verification-repository' } as NonNullable<
           ProjectRunProjection['proof']
         >['facts'],

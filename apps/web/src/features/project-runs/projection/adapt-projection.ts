@@ -109,6 +109,7 @@ export function adaptProjectRunProjection(projection: ProjectRunProjection): Roa
 
   return {
     runId: projection.id,
+    planRevision: `${projection.plan.id}:${projection.plan.schemaVersion}`,
     runState: projection.state,
     currentTaskId: projection.currentTaskId,
     recommendedTaskId: projection.recommendedTaskId,

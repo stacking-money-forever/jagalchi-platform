@@ -5,6 +5,8 @@ export interface ApiTransport {
 import type { components } from './schema.generated.js';
 
 export type ProjectRunProjection = components['schemas']['ProjectRunProjectionDto'];
+export type ProjectRunListResponse = components['schemas']['ProjectRunListResponseDto'];
+export type ProjectRunState = ProjectRunProjection['state'];
 export type NativeAuthSession = components['schemas']['NativeAuthResponse'];
 export type RealtimeTicket = components['schemas']['RealtimeTicketResponseDto'];
 
@@ -80,6 +82,7 @@ async function postProjectRunCommand(
   transport: ApiTransport,
   path: string,
   headers: ProjectRunCommandHeaders,
+  body?: unknown,
 ): Promise<void> {
   await transport.request<void>(path, {
     method: 'POST',
@@ -87,6 +90,7 @@ async function postProjectRunCommand(
       'if-match': headers.ifMatch,
       'idempotency-key': headers.idempotencyKey,
     },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 }
 
@@ -116,13 +120,24 @@ export function deferProjectRunTask(
   return postProjectRunCommand(transport, taskCommandPath(runId, taskId, 'defer'), headers);
 }
 
+export interface BlockProjectRunTaskBody {
+  reasonCode: string;
+  note?: string;
+}
+
 export function blockProjectRunTask(
   transport: ApiTransport,
   runId: string,
   taskId: string,
   headers: ProjectRunCommandHeaders,
+  body: BlockProjectRunTaskBody = { reasonCode: 'USER_REQUESTED' },
 ): Promise<void> {
-  return postProjectRunCommand(transport, taskCommandPath(runId, taskId, 'block'), headers);
+  return postProjectRunCommand(
+    transport,
+    taskCommandPath(runId, taskId, 'block'),
+    headers,
+    body,
+  );
 }
 
 export function resumeProjectRunTask(
@@ -142,6 +157,50 @@ export function verifyProjectRunTask(
 ): Promise<void> {
   return postProjectRunCommand(transport, taskCommandPath(runId, taskId, 'verify'), headers);
 }
+export type ProjectRunAiHelpProvenance = Record<string, unknown>;
+
+export interface ProjectRunAiHelpRequest {
+  question?: string;
+}
+
+export interface ProjectRunAiHelpResponse {
+  guidance: string;
+  provenance: ProjectRunAiHelpProvenance;
+}
+
+export function requestProjectRunTaskAiHelp(
+  transport: ApiTransport,
+  runId: string,
+  taskId: string,
+  headers: ProjectRunCommandHeaders,
+  body: ProjectRunAiHelpRequest = {},
+): Promise<ProjectRunAiHelpResponse> {
+  return transport.request<ProjectRunAiHelpResponse>(
+    `/project-runs/${encodeURIComponent(runId)}/tasks/${encodeURIComponent(taskId)}/ai-help`,
+    {
+      method: 'POST',
+      headers: {
+        'if-match': headers.ifMatch,
+        'idempotency-key': headers.idempotencyKey,
+      },
+      body: JSON.stringify(body),
+    },
+  );
+}
+export interface BindProjectRunPullRequestBody {
+  githubRepositoryId: string;
+  pullNumber: number;
+}
+
+export function bindProjectRunPullRequest(
+  transport: ApiTransport,
+  runId: string,
+  headers: ProjectRunCommandHeaders,
+  body: BindProjectRunPullRequestBody,
+): Promise<void> {
+  return postProjectRunCommand(transport, runCommandPath(runId, 'pull-request'), headers, body);
+}
+
 
 export function publishProjectRun(
   transport: ApiTransport,
@@ -175,6 +234,28 @@ export function getProjectRun(
   return transport.request<ProjectRunProjection>(`/project-runs/${encodeURIComponent(runId)}`, {
     method: 'GET',
     signal,
+  });
+}
+
+export interface ProjectRunListParams {
+  state?: ProjectRunState;
+  limit?: number;
+  cursor?: string;
+  signal?: AbortSignal;
+}
+
+export function listProjectRuns(
+  transport: ApiTransport,
+  params: ProjectRunListParams = {},
+): Promise<ProjectRunListResponse> {
+  const query = new URLSearchParams();
+  if (params.state) query.set('state', params.state);
+  if (params.limit !== undefined) query.set('limit', String(params.limit));
+  if (params.cursor) query.set('cursor', params.cursor);
+  const suffix = query.size > 0 ? `?${query.toString()}` : '';
+  return transport.request<ProjectRunListResponse>(`/project-runs${suffix}`, {
+    method: 'GET',
+    signal: params.signal,
   });
 }
 

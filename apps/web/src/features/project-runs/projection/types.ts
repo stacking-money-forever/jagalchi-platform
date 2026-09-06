@@ -30,6 +30,8 @@ export type RoadmapProofState = {
 
 export type RoadmapGraphModel = {
   runId: string;
+  /** Stable plan snapshot identity used for presentation-only persistence. */
+  planRevision?: string;
   runState: 'READY' | 'ACTIVE' | 'BLOCKED' | 'COMPLETED' | 'ARCHIVED';
   currentTaskId: string | null;
   recommendedTaskId: string | null;
@@ -52,6 +54,8 @@ export interface RoadmapNodeData extends Record<string, unknown> {
   zoomTier?: ZoomTier;
   proofState?: RoadmapProofState | null;
   onPath?: boolean;
+  onToggle?: (milestoneId: string) => void;
+  onSelect?: (taskId: string) => void;
 }
 
 export interface RoadmapNode {

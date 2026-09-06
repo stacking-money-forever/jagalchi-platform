@@ -104,20 +104,23 @@ export async function openProjectRunWorkspace(page: Page, projectRunId: string) 
   await expectNoServiceWorker(page);
 }
 
-export async function selectWorkspaceTab(page: Page, label: '지도' | '포커스' | 'Proof') {
-  await page.getByRole('tab', { name: label }).click();
-  await expect(page.getByRole('tab', { name: label })).toHaveAttribute('aria-selected', 'true');
+export async function selectWorkspaceTab(page: Page, label: '지도' | '선형' | '포커스' | 'Proof') {
+  const tab = page.getByRole('tab', { name: label, exact: true });
+  await tab.click();
+  await expect(tab).toHaveAttribute('aria-selected', 'true');
 
   if (label === '지도') {
     await expect(page.getByRole('heading', { name: '실행 로드맵 지도' })).toBeVisible();
     return;
   }
-
+  if (label === '선형') {
+    await expect(page.getByRole('heading', { name: '실행 로드맵 선형 보기' })).toBeVisible();
+    return;
+  }
   if (label === '포커스') {
     await expect(focusWorkspaceLocator(page)).toBeVisible();
     return;
   }
-
   await expect(repositoryBindingRegion(page)).toBeVisible();
 }
 
@@ -263,9 +266,13 @@ export async function selectWaveBExistingRepository(
   const continueButton = page.getByRole('button', { name: '범위 확인으로 계속' });
   await expect(continueButton).toBeEnabled();
   await continueButton.click();
+  return repositoryId!;
 }
 
-export async function completeWaveBWizardFromProfileReview(page: Page) {
+export async function completeWaveBWizardFromProfileReview(
+  page: Page,
+  options: { observeProjectRunLoading?: boolean } = {},
+) {
   await ensureSeedSession(page);
   await expect(page.getByRole('heading', { name: '로그인이 필요합니다' })).not.toBeVisible();
   await expect(page.getByRole('heading', { name: 'GitHub 증거 스냅샷 검토' })).toBeVisible({
@@ -284,12 +291,22 @@ export async function completeWaveBWizardFromProfileReview(page: Page) {
   await page.getByRole('button', { name: '이 제안 선택' }).first().click();
   await page.getByRole('button', { name: '저장소 연결로 계속' }).click();
 
-  await selectWaveBExistingRepository(page);
+  const repositoryId = await selectWaveBExistingRepository(page);
 
   await expect(page.getByRole('heading', { name: '범위 및 비목표 확인' })).toBeVisible();
+  const projectRunResponse = page.waitForResponse(
+    (response) =>
+      response.url().endsWith('/api/project-run-operations') &&
+      response.request().method() === 'POST',
+  );
   await page.getByRole('button', { name: '프로젝트 실행 만들기' }).click();
-
+  if (options.observeProjectRunLoading) {
+    await expect(page.locator('[aria-busy="true"]')).toBeVisible();
+  }
+  const response = await projectRunResponse;
+  expect(response.status()).toBe(202);
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/i, { timeout: 180_000 });
   await expect(page.getByRole('tab', { name: '지도' })).toBeVisible();
   await expectNoServiceWorker(page);
+  return { repositoryId, operation: await response.json() };
 }

@@ -852,6 +852,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/project-runs/{id}/tasks/{taskId}/ai-help": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ProjectRunsController_aiHelp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/project-runs/{id}/archive": {
         parameters: {
             query?: never;
@@ -1919,6 +1935,10 @@ export interface components {
         PublishProofDto: Record<string, never>;
         UnpublishProofDto: Record<string, never>;
         GithubInstallationClaimDto: Record<string, never>;
+        ProjectRunTargetDto: {
+            company: string;
+            role: string;
+        };
         ProjectRunPlanReceiptDto: {
             provider: string;
             model: string;
@@ -1987,6 +2007,7 @@ export interface components {
             description: string;
         };
         ProjectRunRepositoryBindingDto: {
+            githubRepositoryId: string;
             repositoryName: string | null;
             pullNumber: number | null;
             headSha: string | null;
@@ -2038,6 +2059,8 @@ export interface components {
             /** Format: date-time */
             observedAt: string;
             taskKey?: string | null;
+            taskKeys?: string[];
+            citationIds?: string[];
             pullUrl?: string | null;
             evaluations: components["schemas"]["ProjectRunProofEvaluationDto"][];
         };
@@ -2056,9 +2079,12 @@ export interface components {
             /** @enum {string} */
             state: "READY" | "ACTIVE" | "BLOCKED" | "COMPLETED" | "ARCHIVED";
             version: number;
-            target?: Record<string, never>;
+            /** Format: date-time */
+            updatedAt?: string;
+            target?: components["schemas"]["ProjectRunTargetDto"];
             currentTaskId: string | null;
             recommendedTaskId: string | null;
+            eligibleReadyTaskIds?: string[];
             plan: components["schemas"]["ProjectRunPlanDto"];
             milestones?: components["schemas"]["ProjectRunMilestoneDto"][];
             map: components["schemas"]["ProjectRunMapDto"];
@@ -2068,6 +2094,25 @@ export interface components {
             repositoryBinding?: components["schemas"]["ProjectRunRepositoryBindingDto"];
             pendingOperation?: components["schemas"]["ProjectRunPendingOperationDto"];
             proof: components["schemas"]["ProjectRunProofDto"] | null;
+        };
+        ProjectRunListResponseDto: {
+            items: components["schemas"]["ProjectRunProjectionDto"][];
+            nextCursor: string | null;
+        };
+        ProjectRunAiHelpRequestDto: {
+            question?: string;
+        };
+        ProjectRunAiHelpProvenanceDto: {
+            provider: string;
+            model: string;
+            promptVersion: string;
+            inputHash: string;
+            /** Format: date-time */
+            generatedAt: string;
+        };
+        ProjectRunAiHelpResponseDto: {
+            guidance: string;
+            provenance: components["schemas"]["ProjectRunAiHelpProvenanceDto"];
         };
         BindProjectRunPullRequestDto: {
             githubRepositoryId: string;
@@ -3354,10 +3399,10 @@ export interface operations {
     };
     ProjectRunsController_listProjectRuns: {
         parameters: {
-            query: {
-                state: string;
-                limit: string;
-                cursor: string;
+            query?: {
+                state?: "READY" | "ACTIVE" | "BLOCKED" | "COMPLETED" | "ARCHIVED";
+                limit?: number;
+                cursor?: string;
             };
             header?: never;
             path?: never;
@@ -3369,7 +3414,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ProjectRunListResponseDto"];
+                };
             };
         };
     };
@@ -3506,6 +3553,32 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    ProjectRunsController_aiHelp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectRunAiHelpRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRunAiHelpResponseDto"];
+                };
             };
         };
     };
