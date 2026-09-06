@@ -145,8 +145,9 @@ async function captureThemeEvidence(
   theme: 'light' | 'dark',
 ) {
   await page.setViewportSize(viewport);
-  await page.goto(`/projects/${runId}`);
+  await page.goto('/myroadmap');
   await selectExplicitTheme(page, theme);
+  await page.goto(`/projects/${runId}`);
   await selectWorkspaceTab(page, 'Proof');
   await expect(page.getByRole('note', { name: '검증 출처 안내' })).toContainText(
     '실제 GitHub 검증 결과가 아닙니다.',
