@@ -1,3 +1,5 @@
+import type { WebSessionResponse } from '@jagalchi/api-client';
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api';
 
 /** cross-origin API일 때만 credentials: include (프록시 환경에선 same-origin) */
@@ -49,6 +51,39 @@ export function resetCsrfToken(): void {
   csrfTokenExpiresAt = 0;
 }
 
+/** Proxy-mode browser fetch that mirrors apiClient CSRF handling for createApiTransport callers. */
+export function createCsrfAwareFetch(fetchImplementation: typeof fetch = fetch): typeof fetch {
+  return async (input, init) => {
+    const method = (init?.method ?? 'GET').toUpperCase();
+    const credentials = init?.credentials ?? CREDENTIALS;
+
+    if (!IS_PROXY_MODE || SAFE_METHODS_SET.has(method)) {
+      return fetchImplementation(input, { ...init, credentials });
+    }
+
+    const attachCsrf = async (token: string | null) => {
+      const headers = new Headers(init?.headers);
+      if (token) headers.set('X-CSRF-Token', token);
+      return fetchImplementation(input, { ...init, credentials, headers });
+    };
+
+    let response = await attachCsrf(await getCsrfToken());
+
+    if (response.status === 403) {
+      const error = (await response
+        .clone()
+        .json()
+        .catch(() => undefined)) as { code?: unknown } | undefined;
+      if (error?.code === 'CSRF_TOKEN_INVALID') {
+        resetCsrfToken();
+        response = await attachCsrf(await getCsrfToken());
+      }
+    }
+
+    return response;
+  };
+}
+
 export const SESSION_COOKIE_KEY = 'jagalchi-session';
 
 interface ApiError {
@@ -74,9 +109,9 @@ class ApiClientError extends Error {
   }
 }
 
-// --- Token Management (in-memory only) ---
+// --- Session presence (the browser never receives an access token) ---
 
-let accessToken: string | null = null;
+let hasWebSession = false;
 let isRefreshing = false;
 let refreshPromise: Promise<RefreshResult> | null = null;
 let refreshEpoch = 0;
@@ -85,7 +120,7 @@ let refreshAbortController: AbortController | null = null;
 const sessionEndingListeners = new Set<() => void>();
 
 export type RefreshResult =
-  | { status: 'refreshed'; accessToken: string }
+  | { status: 'refreshed'; session: WebSessionResponse }
   | { status: 'session-ending' }
   | { status: 'expired' };
 
@@ -111,27 +146,18 @@ export function subscribeToAuthSessionResume(listener: () => void): () => void {
   return () => sessionEndingListeners.delete(listener);
 }
 
-export function getAccessToken(): string | null {
-  return accessToken;
+export function hasActiveWebSession(): boolean {
+  return hasWebSession;
 }
 
-/** 액세스 토큰 저장 (메모리 + 미들웨어용 세션 플래그 쿠키) */
-export function setAccessToken(token: string): void {
-  accessToken = token;
-  if (typeof document !== 'undefined') {
-    const secureFlag = location.protocol === 'https:' ? '; Secure' : '';
-    document.cookie = `${SESSION_COOKIE_KEY}=1; path=/; SameSite=Strict${secureFlag}`;
-  }
+export function markWebSessionActive(): void {
+  hasWebSession = true;
 }
 
-/** 액세스 토큰 삭제 (메모리 + 세션 쿠키) */
-export function clearAccessToken(): void {
-  accessToken = null;
+/** HttpOnly 쿠키는 auth route handler가 삭제하며 여기서는 UI 상태만 비운다. */
+export function clearWebSessionPresence(): void {
+  hasWebSession = false;
   resetCsrfToken();
-  if (typeof document !== 'undefined') {
-    const secureFlag = location.protocol === 'https:' ? '; Secure' : '';
-    document.cookie = `${SESSION_COOKIE_KEY}=; path=/; max-age=0; SameSite=Strict${secureFlag}`;
-  }
 }
 
 /** 인증 엔드포인트 여부 (401 시 refresh 스킵) */
@@ -172,12 +198,12 @@ export async function refreshAccessToken(): Promise<RefreshResult> {
 
       if (!response.ok) return { status: 'expired' };
 
-      const data = (await response.json()) as { accessToken: string };
+      const session = (await response.json()) as WebSessionResponse;
       if (sessionEnding || requestEpoch !== refreshEpoch) {
         return { status: 'session-ending' };
       }
-      setAccessToken(data.accessToken);
-      return { status: 'refreshed', accessToken: data.accessToken };
+      markWebSessionActive();
+      return { status: 'refreshed', session };
     } catch {
       return sessionEnding || requestEpoch !== refreshEpoch
         ? { status: 'session-ending' }
@@ -203,25 +229,43 @@ async function request<T>(
 ): Promise<T> {
   const url = `${BASE_URL}${endpoint}`;
 
-  const token = getAccessToken();
-  const authHeader: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-
   const csrfHeader: Record<string, string> = {};
   if (!SAFE_METHODS_SET.has(init.method)) {
     const csrf = await getCsrfToken();
     if (csrf) csrfHeader['X-CSRF-Token'] = csrf;
   }
 
-  const response = await fetch(url, {
+  let response = await fetch(url, {
     ...init,
     credentials: CREDENTIALS,
     headers: {
       'Content-Type': 'application/json',
-      ...authHeader,
       ...csrfHeader,
       ...init.headers,
     },
   });
+
+  if (response.status === 403 && IS_PROXY_MODE && !SAFE_METHODS_SET.has(init.method)) {
+    const error = (await response
+      .clone()
+      .json()
+      .catch(() => undefined)) as { code?: unknown } | undefined;
+    if (error?.code === 'CSRF_TOKEN_INVALID') {
+      resetCsrfToken();
+      const renewedCsrf = await getCsrfToken();
+      if (renewedCsrf) {
+        response = await fetch(url, {
+          ...init,
+          credentials: CREDENTIALS,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': renewedCsrf,
+            ...init.headers,
+          },
+        });
+      }
+    }
+  }
 
   if (!response.ok) {
     // 401 + 비인증 엔드포인트 → refresh 시도 후 재요청
@@ -235,7 +279,6 @@ async function request<T>(
           credentials: CREDENTIALS,
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${refreshResult.accessToken}`,
             ...csrfHeader,
             ...init.headers,
           },
@@ -258,10 +301,12 @@ async function request<T>(
       }
 
       // refresh 실패 → 토큰 클리어 (보호 라우트에서만 리다이렉트)
-      clearAccessToken();
+      clearWebSessionPresence();
       const isProtectedRoute =
         typeof window !== 'undefined' &&
-        ['/myroadmap', '/profile', '/editor'].some((r) => window.location.pathname.startsWith(r));
+        ['/career', '/myroadmap', '/profile', '/editor', '/projects'].some((route) =>
+          window.location.pathname.startsWith(route),
+        );
       if (isProtectedRoute) {
         window.location.replace(new URL('/login', window.location.origin).href);
       }

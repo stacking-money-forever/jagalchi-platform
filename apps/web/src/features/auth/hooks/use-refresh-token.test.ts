@@ -17,6 +17,10 @@ const mockRestoreAuthSession = vi.fn();
 const authSessionResumeListeners = new Set<() => void>();
 const mockBeginIdentityEnding = vi.fn();
 const mockFinishIdentityEnding = vi.fn((_userId: string | null) => Promise.resolve(true));
+const sessionFor = (id: string) => ({
+  authenticated: true as const,
+  user: { id, email: `${id}@example.com`, name: id, roles: ['USER'] },
+});
 
 vi.mock('@/api/auth', () => ({
   refreshToken: vi.fn(),
@@ -24,9 +28,9 @@ vi.mock('@/api/auth', () => ({
 }));
 
 vi.mock('@/api/client', () => ({
-  getAccessToken: () => currentAccessToken,
-  setAccessToken: (token: string) => mockSetAccessToken(token),
-  clearAccessToken: () => mockClearAccessToken(),
+  hasActiveWebSession: () => currentAccessToken !== null,
+  markWebSessionActive: () => mockSetAccessToken('web-session'),
+  clearWebSessionPresence: () => mockClearAccessToken(),
   beginAuthSessionEnding: () => mockBeginAuthSessionEnding(),
   completeAuthSessionEnding: () => mockCompleteAuthSessionEnding(),
   restoreAuthSessionAfterEnding: () => {
@@ -62,7 +66,7 @@ describe('useRefreshToken', () => {
   });
 
   it('calls refreshToken on mount and sets initialized', async () => {
-    vi.mocked(refreshToken).mockResolvedValue({ accessToken: 'new-token' });
+    vi.mocked(refreshToken).mockResolvedValue({ authenticated: true });
 
     renderHook(() => useRefreshToken(), { wrapper: createTestWrapper() });
 
@@ -73,7 +77,7 @@ describe('useRefreshToken', () => {
 
     expect(refreshToken).toHaveBeenCalled();
     // loginAtom calls setAccessToken internally
-    expect(mockSetAccessToken).toHaveBeenCalledWith('new-token');
+    expect(mockSetAccessToken).toHaveBeenCalledWith('web-session');
   });
 
   it('clears token and logs out on refresh failure', async () => {
@@ -111,7 +115,7 @@ describe('useRefreshToken', () => {
   });
 
   it('starts interval on successful refresh', async () => {
-    vi.mocked(refreshToken).mockResolvedValue({ accessToken: 'token' });
+    vi.mocked(refreshToken).mockResolvedValue({ authenticated: true });
 
     renderHook(() => useRefreshToken(), { wrapper: createTestWrapper() });
 
@@ -148,7 +152,7 @@ describe('useRefreshToken', () => {
   });
 
   it('cleans up interval on unmount', async () => {
-    vi.mocked(refreshToken).mockResolvedValue({ accessToken: 'token' });
+    vi.mocked(refreshToken).mockResolvedValue({ authenticated: true });
 
     const { unmount } = renderHook(() => useRefreshToken(), {
       wrapper: createTestWrapper(),
@@ -170,7 +174,7 @@ describe('useRefreshToken', () => {
 
   it('does not let a never-settling hook refresh block logout', async () => {
     vi.mocked(refreshToken).mockImplementation(() => new Promise(() => undefined));
-    vi.mocked(logout).mockResolvedValue(undefined);
+    vi.mocked(logout).mockResolvedValue({ localSessionCleared: true, revokeConfirmed: true });
 
     const { result } = renderHook(() => useRefreshToken(), { wrapper: createTestWrapper() });
     expect(refreshToken).toHaveBeenCalledTimes(1);
@@ -189,12 +193,13 @@ describe('useRefreshToken', () => {
   it('finalizes a successful logout after the provider remounts', async () => {
     let resolveLogout: (() => void) | undefined;
     vi.mocked(refreshToken)
-      .mockResolvedValueOnce({ accessToken: 'token' })
+      .mockResolvedValueOnce({ authenticated: true })
       .mockImplementationOnce(() => new Promise(() => undefined));
     vi.mocked(logout).mockImplementation(
       () =>
-        new Promise<void>((resolve) => {
-          resolveLogout = resolve;
+        new Promise((resolve) => {
+          resolveLogout = () =>
+            resolve({ localSessionCleared: true as const, revokeConfirmed: true });
         }),
     );
 
@@ -230,17 +235,17 @@ describe('useRefreshToken', () => {
   });
 
   it('invalidates an in-flight refresh and cancels the interval before logout', async () => {
-    let resolveRefresh: ((value: { accessToken: string }) => void) | undefined;
+    let resolveRefresh: ((value: { authenticated: true }) => void) | undefined;
     vi.mocked(refreshToken)
-      .mockResolvedValue({ accessToken: 'active-token' })
-      .mockResolvedValueOnce({ accessToken: 'initial-token' })
+      .mockResolvedValue({ authenticated: true })
+      .mockResolvedValueOnce({ authenticated: true })
       .mockImplementationOnce(
         () =>
           new Promise((resolve) => {
             resolveRefresh = resolve;
           }),
       );
-    vi.mocked(logout).mockResolvedValue(undefined);
+    vi.mocked(logout).mockResolvedValue({ localSessionCleared: true, revokeConfirmed: true });
 
     const { result } = renderHook(() => useRefreshToken(), { wrapper: createTestWrapper() });
 
@@ -256,7 +261,7 @@ describe('useRefreshToken', () => {
 
     const logoutRequest = result.current.logoutSession();
     await act(async () => {
-      resolveRefresh?.({ accessToken: 'stale-token' });
+      resolveRefresh?.({ authenticated: true });
       await logoutRequest;
     });
 
@@ -276,12 +281,10 @@ describe('useRefreshToken', () => {
   });
 
   it('starts periodic refresh again when a new user logs in after logout', async () => {
-    const firstToken = 'header.eyJzdWIiOiJmaXJzdC11c2VyIn0.signature';
-    const secondToken = 'header.eyJzdWIiOiJzZWNvbmQtdXNlciJ9.signature';
     vi.mocked(refreshToken)
-      .mockResolvedValueOnce({ accessToken: firstToken })
-      .mockResolvedValue({ accessToken: 'rotated-token' });
-    vi.mocked(logout).mockResolvedValue(undefined);
+      .mockResolvedValueOnce(sessionFor('first-user'))
+      .mockResolvedValue(sessionFor('second-user'));
+    vi.mocked(logout).mockResolvedValue({ localSessionCleared: true, revokeConfirmed: true });
 
     const { result } = renderHook(
       () => ({ session: useRefreshToken(), setLogin: useSetAtom(loginAtom) }),
@@ -296,7 +299,7 @@ describe('useRefreshToken', () => {
     });
 
     vi.mocked(refreshToken).mockClear();
-    act(() => result.current.setLogin(secondToken));
+    act(() => result.current.setLogin(sessionFor('second-user')));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(14 * 60 * 1000);
     });
@@ -305,7 +308,7 @@ describe('useRefreshToken', () => {
   });
 
   it('keeps the local session and exposes a retryable error when revoke fails', async () => {
-    vi.mocked(refreshToken).mockResolvedValue({ accessToken: 'token' });
+    vi.mocked(refreshToken).mockResolvedValue({ authenticated: true });
     vi.mocked(logout).mockRejectedValue(new Error('revoke failed'));
 
     const { result } = renderHook(() => useRefreshToken(), { wrapper: createTestWrapper() });
@@ -338,17 +341,37 @@ describe('useRefreshToken', () => {
     expect(refreshToken).toHaveBeenCalledTimes(1);
   });
 
+  it('clears UI identity and does not restore refresh when server revoke is unconfirmed', async () => {
+    vi.mocked(refreshToken).mockResolvedValue(sessionFor('ending-user'));
+    vi.mocked(logout).mockResolvedValue({
+      localSessionCleared: true,
+      revokeConfirmed: false,
+    });
+    const { result } = renderHook(() => useRefreshToken(), { wrapper: createTestWrapper() });
+    await act(async () => {
+      await vi.runOnlyPendingTimersAsync();
+      await result.current.logoutSession();
+    });
+    expect(mockClearAccessToken).toHaveBeenCalled();
+    expect(mockFinishIdentityEnding).toHaveBeenCalledWith(null);
+    expect(mockCompleteAuthSessionEnding).toHaveBeenCalledTimes(1);
+    vi.mocked(refreshToken).mockClear();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(14 * 60 * 1000);
+    });
+    expect(refreshToken).not.toHaveBeenCalled();
+  });
+
   it('restores the remounted provider after revoke fails during session ending', async () => {
     let rejectLogout: ((error: Error) => void) | undefined;
-    const priorToken = 'header.eyJzdWIiOiJwcmlvci11c2VyIn0.signature';
     vi.mocked(refreshToken)
-      .mockResolvedValueOnce({ accessToken: priorToken })
+      .mockResolvedValueOnce(sessionFor('prior-user'))
       .mockResolvedValueOnce({ status: 'session-ending' })
-      .mockResolvedValueOnce({ accessToken: 'restored-token' })
-      .mockResolvedValue({ accessToken: 'interval-token' });
+      .mockResolvedValueOnce(sessionFor('prior-user'))
+      .mockResolvedValue(sessionFor('prior-user'));
     vi.mocked(logout).mockImplementation(
       () =>
-        new Promise<void>((_resolve, reject) => {
+        new Promise<never>((_resolve, reject) => {
           rejectLogout = reject;
         }),
     );
@@ -382,7 +405,7 @@ describe('useRefreshToken', () => {
     expect(logoutError).toEqual(new Error('revoke failed'));
     expect(mockClearAccessToken).not.toHaveBeenCalled();
     expect(mockFinishIdentityEnding).toHaveBeenCalledWith('prior-user');
-    expect(mockSetAccessToken).toHaveBeenCalledWith('restored-token');
+    expect(mockSetAccessToken).toHaveBeenCalledWith('web-session');
 
     vi.mocked(refreshToken).mockClear();
     await act(async () => {
@@ -393,7 +416,7 @@ describe('useRefreshToken', () => {
   });
 
   it('uses the same local cleanup path after account deletion succeeds', async () => {
-    vi.mocked(refreshToken).mockResolvedValue({ accessToken: 'token' });
+    vi.mocked(refreshToken).mockResolvedValue({ authenticated: true });
 
     const { result } = renderHook(() => useRefreshToken(), { wrapper: createTestWrapper() });
 

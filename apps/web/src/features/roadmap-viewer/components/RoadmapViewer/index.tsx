@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { ReactFlowProvider } from '@xyflow/react';
 import { useAtom, useAtomValue } from 'jotai';
@@ -23,7 +23,6 @@ import { ForkTreeDialog } from '../ForkTreeDialog';
 import { HeaderExportMenu } from '../HeaderExportMenu';
 import { HeaderMenu } from '../HeaderMenu';
 import { HeaderSaveAsImageMenu } from '../HeaderSaveAsImageMenu';
-import { LearningCoachModal } from '../LearningCoachModal';
 import { RoadmapHeader } from '../RoadmapHeader';
 import { ViewerCanvas } from '../ViewerCanvas';
 import { ViewerSidebar } from '../ViewerSidebar';
@@ -41,9 +40,7 @@ function ViewerContent({ roadmapId }: RoadmapViewerProps) {
   const roadmap = useAtomValue(viewerRoadmapAtom);
   const [layout, setLayout] = useAtom(viewerLayoutAtom);
   const [isSidebarOpen, setIsSidebarOpen] = useAtom(viewerSidebarOpenAtom);
-  const [isCoachOpen, setIsCoachOpen] = useState(false);
   const capturedRoadmapId = useRef<string | null>(null);
-  const aiEnabled = process.env.NEXT_PUBLIC_AI_FEATURES_ENABLED === 'true';
 
   useEffect(() => {
     if (!window.matchMedia('(max-width: 767px)').matches) return;
@@ -77,7 +74,6 @@ function ViewerContent({ roadmapId }: RoadmapViewerProps) {
       <RoadmapHeader
         roadmapId={roadmapId}
         roadmapTitle={roadmap?.title ?? VIEWER_MESSAGES.DEFAULT_ROADMAP_TITLE}
-        onAiFeedback={aiEnabled ? () => setIsCoachOpen(true) : undefined}
       />
 
       <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-3 px-3 py-3 sm:gap-4 sm:px-4 sm:py-4 lg:flex-row">
@@ -138,14 +134,6 @@ function ViewerContent({ roadmapId }: RoadmapViewerProps) {
       </div>
 
       {layout === 'page' && <ViewerZoomControls />}
-
-      {aiEnabled ? (
-        <LearningCoachModal
-          isOpen={isCoachOpen}
-          onClose={() => setIsCoachOpen(false)}
-          roadmapId={roadmapId}
-        />
-      ) : null}
     </div>
   );
 }

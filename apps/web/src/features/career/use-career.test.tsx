@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { accessTokenAtom, isAuthInitializedAtom } from '@/lib/auth-atoms';
+import { sessionPresentAtom, isAuthInitializedAtom } from '@/lib/auth-atoms';
 import { createTestWrapper } from '@/test-utils';
 
 vi.mock('@/api/career', () => ({
@@ -24,7 +24,7 @@ describe('Career query authentication', () => {
 
   it('does not request authenticated data before refresh-session initialization finishes', () => {
     const wrapper = createTestWrapper([
-      [accessTokenAtom, null],
+      [sessionPresentAtom, null],
       [isAuthInitializedAtom, false],
     ] as const);
 
@@ -38,7 +38,7 @@ describe('Career query authentication', () => {
 
   it('loads initial Career data after authentication is initialized', async () => {
     const wrapper = createTestWrapper([
-      [accessTokenAtom, 'access-token'],
+      [sessionPresentAtom, true],
       [isAuthInitializedAtom, true],
     ] as const);
 

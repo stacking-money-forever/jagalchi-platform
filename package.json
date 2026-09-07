@@ -4,16 +4,19 @@
   "private": true,
   "packageManager": "pnpm@10.33.2",
   "engines": {
-    "node": ">=24"
+    "node": ">=24.3 <25"
   },
   "scripts": {
     "dev:web": "pnpm --filter @jagalchi/web dev",
-    "dev:api": "pnpm --filter @jagalchi/api start:dev",
-    "lint": "pnpm --filter @jagalchi/web lint && pnpm --filter @jagalchi/api lint",
-    "test": "pnpm --filter @jagalchi/web test:run && pnpm --filter @jagalchi/api test",
-    "typecheck": "pnpm --filter @jagalchi/mobile typecheck",
-    "build": "pnpm --filter @jagalchi/api build && pnpm --filter @jagalchi/web build",
+    "dev:v1": "bash scripts/dev-v1.sh",
+    "test:v1-local": "bash scripts/test-v1-local-e2e.sh",
+    "check:v1-harness": "bash scripts/check-v1-harness.sh",
+    "lint": "pnpm --filter @jagalchi/api-client lint && pnpm --filter @jagalchi/web lint",
+    "test": "pnpm --filter @jagalchi/api-client test && pnpm --filter @jagalchi/web test:run && pnpm --filter @jagalchi/mobile test",
+    "typecheck": "pnpm --filter @jagalchi/api-client typecheck && pnpm --filter @jagalchi/api-client typecheck:consumers && pnpm --filter @jagalchi/web typecheck && pnpm --filter @jagalchi/mobile typecheck",
+    "build": "pnpm --filter @jagalchi/api-client build && pnpm --filter @jagalchi/web build",
     "verify": "pnpm lint && pnpm test && pnpm typecheck && pnpm build",
+    "postinstall": "pnpm --filter @jagalchi/api-client build",
     "prepare": "husky"
   },
   "devDependencies": {

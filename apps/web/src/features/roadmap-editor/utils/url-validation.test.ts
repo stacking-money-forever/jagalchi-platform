@@ -51,6 +51,16 @@ describe('validateUrl', () => {
   it('returns null for completely invalid URL', () => {
     expect(validateUrl('not a valid url ://???')).toBeNull();
   });
+
+  it('preserves a durable same-origin upload content path', () => {
+    expect(validateUrl('/api/uploads/11111111-1111-4111-8111-111111111111/content')).toBe(
+      '/api/uploads/11111111-1111-4111-8111-111111111111/content',
+    );
+  });
+
+  it('does not treat arbitrary same-origin paths as upload content', () => {
+    expect(validateUrl('/api/admin')).toBeNull();
+  });
 });
 
 describe('isValidUrl', () => {

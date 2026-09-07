@@ -1,0 +1,11 @@
+@font-face {
+  font-family: 'Wanted Sans';
+  src: url('../src/app/fonts/WantedSansVariable.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+}
+
+:root {
+  --font-wanted-sans: 'Wanted Sans';
+}

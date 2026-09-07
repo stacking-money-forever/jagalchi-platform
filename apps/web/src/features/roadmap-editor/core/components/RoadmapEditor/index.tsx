@@ -31,7 +31,7 @@ function EditorContent({ onBack, roadmapId }: EditorContentProps) {
         <div className="flex-1">
           <RoadmapCanvas roadmapId={roadmapId} />
         </div>
-        <EditorSidebar />
+        <EditorSidebar roadmapId={roadmapId} />
       </div>
 
       <EditorToolbar />

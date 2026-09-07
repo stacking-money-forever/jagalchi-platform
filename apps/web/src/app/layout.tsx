@@ -27,7 +27,7 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: '자갈치 — 증거로 준비하는 개발자 커리어',
+    default: '자갈치, 증거로 준비하는 개발자 커리어',
     template: '%s | 자갈치',
   },
   description:
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
   },
   manifest: '/manifest.webmanifest',
   openGraph: {
-    title: '자갈치 — 증거로 준비하는 개발자 커리어',
+    title: '자갈치, 증거로 준비하는 개발자 커리어',
     description: '채용공고의 요구 역량과 실제 결과물 사이의 차이를 확인하고 검증합니다.',
     siteName: '자갈치',
     locale: 'ko_KR',
@@ -45,7 +45,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: '자갈치 — 증거로 준비하는 개발자 커리어',
+    title: '자갈치, 증거로 준비하는 개발자 커리어',
     description: '채용공고의 요구 역량과 실제 결과물 사이의 차이를 확인하고 검증합니다.',
   },
   robots: {

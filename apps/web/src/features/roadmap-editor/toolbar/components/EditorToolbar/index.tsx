@@ -7,7 +7,6 @@ import { SquarePlus, Spline, Frame, Type } from 'lucide-react';
 
 import { EDITOR_MESSAGES } from '@/constants/messages';
 
-import { EditorAiMenu } from '../../../components/molecules/EditorAiMenu';
 import { useCanvasCenter } from '../../../hooks/use-canvas-center';
 import { activeToolAtom, nodesAtom } from '../../../stores/editor-atoms';
 import {
@@ -100,10 +99,6 @@ export const EditorToolbar = memo(function EditorToolbar() {
           onClick={handleTextAdd}
           testId="toolbar-add-text"
         />
-
-        <div className="bg-border mx-1 h-8 w-px" />
-
-        <EditorAiMenu />
       </div>
     </div>
   );

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const { capture, exchangeOAuthCode } = vi.hoisted(() => ({
   capture: vi.fn(),
-  exchangeOAuthCode: vi.fn().mockResolvedValue({ accessToken: 'access-token' }),
+  exchangeOAuthCode: vi.fn().mockResolvedValue({ authenticated: true }),
 }));
 
 vi.mock('@/api/auth', () => ({
@@ -43,7 +43,7 @@ describe('native OAuth bridge', () => {
       }),
     );
 
-    await expect(pending).resolves.toBe('access-token');
+    await expect(pending).resolves.toEqual({ authenticated: true });
     expect(exchangeOAuthCode).toHaveBeenCalledWith('one-time-code');
     expect(capture).toHaveBeenCalledWith('oauth_completed', {});
   });

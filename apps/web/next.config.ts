@@ -35,8 +35,8 @@ function toWebSocketOrigin(origin: string): string {
 }
 
 const PUBLIC_API_ORIGIN = getOrigin(process.env.NEXT_PUBLIC_API_URL);
-const PUBLIC_WS_HTTP_ORIGIN = getOrigin(process.env.NEXT_PUBLIC_WS_URL) ?? API_ORIGIN;
-const PUBLIC_WS_TRANSPORT_ORIGIN = toWebSocketOrigin(PUBLIC_WS_HTTP_ORIGIN);
+const PUBLIC_REALTIME_HTTP_ORIGIN = getOrigin(process.env.NEXT_PUBLIC_REALTIME_URL) ?? API_ORIGIN;
+const PUBLIC_REALTIME_TRANSPORT_ORIGIN = toWebSocketOrigin(PUBLIC_REALTIME_HTTP_ORIGIN);
 const ANALYTICS_ORIGIN = getAnalyticsOrigin();
 const CONNECT_ORIGINS = Array.from(
   new Set(
@@ -44,8 +44,8 @@ const CONNECT_ORIGINS = Array.from(
       'self',
       API_ORIGIN,
       PUBLIC_API_ORIGIN,
-      PUBLIC_WS_HTTP_ORIGIN,
-      PUBLIC_WS_TRANSPORT_ORIGIN,
+      PUBLIC_REALTIME_HTTP_ORIGIN,
+      PUBLIC_REALTIME_TRANSPORT_ORIGIN,
       ANALYTICS_ORIGIN,
     ]
       .filter((origin): origin is string => Boolean(origin))
@@ -71,6 +71,7 @@ const cspHeader = [
   .trim();
 
 const nextConfig: NextConfig = {
+  cacheComponents: true,
   reactCompiler: true,
 
   images: {

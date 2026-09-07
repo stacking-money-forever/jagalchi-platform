@@ -44,6 +44,7 @@ const mocks = vi.hoisted(() => {
   };
   return {
     socket,
+    io: vi.fn(() => socket),
     listeners,
     editBases,
     setEditSequences(conflict: number, success: number) {
@@ -62,6 +63,11 @@ const mocks = vi.hoisted(() => {
 });
 
 const api = vi.hoisted(() => ({
+  issueRealtimeTicket: vi.fn(async () => ({
+    ticket: 'a'.repeat(43),
+    audience: 'roadmaps' as const,
+    expiresAt: new Date(Date.now() + 30_000).toISOString(),
+  })),
   getRoadmapDomainEvents: vi.fn(async (_id: string, _after: number) => ({
     events: [
       {
@@ -74,8 +80,7 @@ const api = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock('socket.io-client', () => ({ io: () => mocks.socket }));
-vi.mock('@/api/client', () => ({ getAccessToken: () => 'access-token' }));
+vi.mock('socket.io-client', () => ({ io: mocks.io }));
 vi.mock('@/api/roadmap-domain', () => api);
 
 import {
@@ -93,7 +98,7 @@ const action = {
 };
 
 describe('realtime client sequence recovery', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     disconnectRealtime();
     mocks.reset();
     api.getRoadmapDomainEvents.mockReset();
@@ -107,7 +112,15 @@ describe('realtime client sequence recovery', () => {
       ],
       currentSequence: 2,
     });
-    connectRealtime({ roadmapId });
+    await connectRealtime({ roadmapId });
+  });
+
+  it('uses a one-time ticket issued through the same-origin API', () => {
+    expect(api.issueRealtimeTicket).toHaveBeenCalledTimes(1);
+    expect(mocks.io).toHaveBeenCalledWith(
+      expect.stringContaining('/roadmaps'),
+      expect.objectContaining({ auth: { ticket: 'a'.repeat(43) }, reconnection: false }),
+    );
   });
 
   it('replays missing events before retrying the same idempotent edit', async () => {

@@ -1,13 +1,17 @@
 # Deployment
 
-Jagalchi Client 의 프로덕션 배포 가이드. 운영 타깃은 **Vercel** 을 단일 표준으로 본다. `Dockerfile`, `docker-compose.yml`, `netlify.toml` 은 자체 호스팅/백업 용도로 유지.
+Jagalchi Client 의 프로덕션 배포 가이드. 운영 타깃은 **Vercel** 을 단일 표준으로 본다.
+Personal-server VM compose, deploy automation, and backend image build live in
+`jagalchi-infra` (production) and `jagalchi-api` / `jagalchi-ai` (GHCR images).
+This platform repo does not ship compose or deploy assets. `Dockerfile` and
+`netlify.toml` under `apps/web/` remain reference-only for alternate hosting.
 
 ## 환경변수 매트릭스
 
 | 변수                            | 필수 | Production                            | Preview / Staging              | Development                        |
 | ------------------------------- | ---- | ------------------------------------- | ------------------------------ | ---------------------------------- |
 | `NEXT_PUBLIC_API_URL`           | ✅   | `/api` (Vercel same-origin proxy)     | `/api`                         | `/api` 또는 `http://localhost:8080` |
-| `NEXT_PUBLIC_WS_URL`            | ✅   | `https://api.jagalchi.dev/ws/roadmap` | staging                        | `http://localhost:8082/ws/roadmap` |
+| `NEXT_PUBLIC_REALTIME_URL`      | ✅   | `https://api.jagalchi.dev`            | staging HTTPS origin           | `http://localhost:8082`            |
 | `NEXT_PUBLIC_SITE_URL`          | ✅   | `https://jagalchi.dev`                | `https://staging.jagalchi.dev` | `http://localhost:3000`            |
 | `NEXT_PUBLIC_ENV`               | ✅   | `production`                          | `staging` / `preview`          | `development`                      |
 | `NEXT_PUBLIC_API_MOCKING`       | ⚠️   | **반드시 `false`**                    | `false`                        | `true` 가능                        |

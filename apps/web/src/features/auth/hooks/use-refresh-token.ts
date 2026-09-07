@@ -5,9 +5,9 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { logout, refreshToken } from '@/api/auth';
 import {
   beginAuthSessionEnding,
-  clearAccessToken,
+  clearWebSessionPresence,
   completeAuthSessionEnding,
-  getAccessToken,
+  hasActiveWebSession,
   restoreAuthSessionAfterEnding,
   subscribeToAuthSessionResume,
 } from '@/api/client';
@@ -39,13 +39,13 @@ export function useRefreshToken() {
   }, []);
 
   const clearLocalSession = useCallback(() => {
-    clearAccessToken();
+    clearWebSessionPresence();
     if (isMountedRef.current) setLogout();
   }, [setLogout]);
 
   const refreshSession = useCallback((): Promise<boolean | null> => {
     const generation = generationRef.current;
-    const tokenAtStart = getAccessToken();
+    const hadSessionAtStart = hasActiveWebSession();
     const request = (async () => {
       try {
         const response = await refreshToken();
@@ -53,11 +53,11 @@ export function useRefreshToken() {
 
         if ('status' in response) return null;
 
-        setLogin(response.accessToken);
+        setLogin(response);
         return true;
       } catch {
         if (!isMountedRef.current || generation !== generationRef.current) return null;
-        if (getAccessToken() !== tokenAtStart) return true;
+        if (hasActiveWebSession() !== hadSessionAtStart) return true;
 
         clearLocalSession();
         stopRefresh();

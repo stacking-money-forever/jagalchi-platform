@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /** 인증이 필요한 라우트 */
-const PROTECTED_ROUTES = ['/career', '/myroadmap', '/profile', '/editor'];
+const PROTECTED_ROUTES = ['/career', '/myroadmap', '/profile', '/editor', '/projects'];
 
 /** 로그인 상태에서 접근 차단할 라우트 */
 const AUTH_ROUTES = ['/login', '/register', '/find-password'];
@@ -41,6 +41,7 @@ export const config = {
     '/career/:path*',
     '/profile/:path*',
     '/editor/:path*',
+    '/projects/:path*',
     '/login',
     '/register',
     '/find-password',

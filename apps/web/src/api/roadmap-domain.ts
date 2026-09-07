@@ -2,7 +2,10 @@ import type { RoadmapNode } from '@/features/roadmap-editor/types/editor.types';
 
 import { apiClient } from './client';
 
+import type { RealtimeTicket } from '@jagalchi/api-client';
 import type { Edge } from '@xyflow/react';
+
+export const issueRealtimeTicket = () => apiClient.post<RealtimeTicket>('/realtime/tickets');
 
 export interface RoadmapGraph {
   schemaVersion: 1;
@@ -27,6 +30,12 @@ export interface RoadmapRecord {
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
+}
+
+const READ_ONLY_PROJECT_RUN_TAGS = ['project-run', 'local-seed'] as const;
+
+export function isReadOnlyProjectRunRoadmap(record: Pick<RoadmapRecord, 'tags'>): boolean {
+  return READ_ONLY_PROJECT_RUN_TAGS.some((tag) => record.tags.includes(tag));
 }
 
 export interface RoadmapDomainEvent {

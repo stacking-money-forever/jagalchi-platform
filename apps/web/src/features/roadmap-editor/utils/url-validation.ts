@@ -2,6 +2,8 @@
  * URL validation utilities to prevent XSS and invalid URLs
  */
 
+import { isUploadContentPath } from '@/lib/upload-content-path';
+
 /**
  * Validate and sanitize a URL string
  * @param url - The URL to validate
@@ -14,6 +16,8 @@ export function validateUrl(url: string): string | null {
   }
 
   const trimmed = url.trim();
+  if (isUploadContentPath(trimmed)) return trimmed;
+  if (trimmed.startsWith('/')) return null;
 
   // Prevent javascript: and data: URIs (XSS vectors)
   const lowerUrl = trimmed.toLowerCase();

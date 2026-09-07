@@ -136,7 +136,6 @@ function generateStorybookName(componentKey: string, variantName: string): strin
     EditorTextSidebar: 'TextPropertiesPanel',
     EditorResourceSidebar: 'ResourcePropertiesPanel',
     EditorToolbarItem: 'ToolbarButton',
-    EditorAIMenu: 'RoadmapAiModal',
   };
 
   const storybookComponent = nameMap[componentKey] || componentKey;

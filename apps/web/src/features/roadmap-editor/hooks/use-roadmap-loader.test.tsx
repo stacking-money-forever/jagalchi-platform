@@ -23,6 +23,8 @@ vi.mock('@/api/roadmap-domain', () => ({
   createDraftRoadmap: mocks.createDraftRoadmap,
   getEditableRoadmap: mocks.getEditableRoadmap,
   getRoadmapDomainEvents: mocks.getRoadmapDomainEvents,
+  isReadOnlyProjectRunRoadmap: (record: { tags: string[] }) =>
+    record.tags.includes('project-run') || record.tags.includes('local-seed'),
 }));
 
 const now = '2025-12-15T14:30:00.000Z';
@@ -52,13 +54,13 @@ function createEdge(): Edge {
   return { id: 'edge-1-2', source: 'node-1', target: 'node-2' };
 }
 
-function mockRoadmapDetail(title = 'API 로드맵') {
+function mockRoadmapDetail(title = 'API 로드맵', tags: string[] = []) {
   mocks.getEditableRoadmap.mockResolvedValue({
     id: '11111111-1111-4111-8111-111111111111',
     title,
     description: 'API 설명',
     visibility: 'PRIVATE',
-    tags: [],
+    tags,
     graph: { schemaVersion: 1, nodes: [], edges: [] },
     createdAt: now,
     updatedAt: now,
@@ -134,6 +136,28 @@ describe('useRoadmapLoader', () => {
     expect(store.get(roadmapTitleAtom)).toBe('이벤트 제목');
     expect(store.get(nodesAtom)).toEqual([{ ...node, position: { x: 180, y: 90 } }]);
     expect(store.get(edgesAtom)).toEqual([edge]);
+  });
+
+  it('refuses project-run roadmaps before initializing editor state', async () => {
+    const store = createStore();
+    mockRoadmapDetail('Jagalchi Local Execution Roadmap', ['local-seed', 'project-run']);
+    mocks.getRoadmapDomainEvents.mockResolvedValue({
+      currentSequence: 0,
+      events: [],
+    });
+
+    const { result } = renderHook(
+      () => useRoadmapLoader({ roadmapId: '11111111-1111-4111-8111-111111111111' }),
+      { wrapper: createWrapper(store) },
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.error).toBe(
+      '프로젝트 실행 전용 로드맵은 기존 편집기에서 열 수 없습니다.',
+    );
+    expect(store.get(nodesAtom)).toEqual([]);
+    expect(store.get(edgesAtom)).toEqual([]);
+    expect(store.get(roadmapTitleAtom)).toBe('새 실행 과제');
   });
 
   it('does not mask authoritative API failures with numeric local data', async () => {

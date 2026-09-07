@@ -44,13 +44,14 @@ export default [
         node: true,
       },
       'boundaries/elements': [
-        { type: 'app', pattern: 'src/app/*' },
-        { type: 'features', pattern: 'src/features/*' },
-        { type: 'components', pattern: 'src/components/*' },
-        { type: 'hooks', pattern: 'src/hooks/*' },
-        { type: 'lib', pattern: 'src/lib/*' },
-        { type: 'types', pattern: 'src/types/*' },
-        { type: 'constants', pattern: 'src/constants/*' },
+        { type: 'app', pattern: 'src/app/**' },
+        { type: 'server', pattern: 'src/server/**' },
+        { type: 'features', pattern: 'src/features/**' },
+        { type: 'components', pattern: 'src/components/**' },
+        { type: 'hooks', pattern: 'src/hooks/**' },
+        { type: 'lib', pattern: 'src/lib/**' },
+        { type: 'types', pattern: 'src/types/**' },
+        { type: 'constants', pattern: 'src/constants/**' },
       ],
     },
     rules: {
@@ -127,8 +128,9 @@ export default [
             // app은 모든 곳에서 import 가능
             {
               from: { type: 'app' },
-              allow: { to: { type: ['features', 'components', 'hooks', 'lib', 'types', 'constants'] } },
+              allow: { to: { type: ['server', 'features', 'components', 'hooks', 'lib', 'types', 'constants'] } },
             },
+            { from: { type: 'server' }, allow: { to: { type: ['server', 'types', 'constants'] } } },
             // features는 공용만 import 가능 (다른 feature 금지)
             {
               from: { type: 'features' },
@@ -143,6 +145,19 @@ export default [
             { from: { type: 'lib' }, allow: { to: { type: ['lib', 'types', 'constants'] } } },
             { from: { type: 'types' }, allow: { to: { type: 'types' } } },
             { from: { type: 'constants' }, allow: { to: { type: ['constants', 'types'] } } },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/components/**/*.{ts,tsx}', 'src/features/**/*.{ts,tsx}', 'src/hooks/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: ['@/server', '@/server/*'], message: 'Client-capable modules cannot import server-only code.' },
           ],
         },
       ],

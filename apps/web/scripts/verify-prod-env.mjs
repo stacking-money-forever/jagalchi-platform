@@ -15,7 +15,6 @@ const APPROVED_ANALYTICS_PROJECTS = {
 };
 
 const REQUIRED_PRODUCTION_FEATURE_FLAGS = [
-  'NEXT_PUBLIC_AI_FEATURES_ENABLED',
   'NEXT_PUBLIC_REALTIME_ENABLED',
   'NEXT_PUBLIC_EVIDENCE_EXECUTION_ENABLED',
   'NEXT_PUBLIC_PROOF_PROFILE_ENABLED',
@@ -25,11 +24,41 @@ const REQUIRED_PRODUCTION_FEATURE_FLAGS = [
 const environment = process.env.NEXT_PUBLIC_ENV;
 const enabledValue = process.env.NEXT_PUBLIC_ANALYTICS_ENABLED;
 const analyticsEnabled = enabledValue === 'true';
+const realtimeEnabled = process.env.NEXT_PUBLIC_REALTIME_ENABLED === 'true';
 const isProductionCheck =
   process.argv.includes('--production') ||
   process.env.VERCEL_ENV === 'production' ||
   environment === 'production';
 const errors = [];
+
+if (realtimeEnabled) {
+  const realtimeUrl = process.env.NEXT_PUBLIC_REALTIME_URL;
+  if (!realtimeUrl) {
+    errors.push('NEXT_PUBLIC_REALTIME_URL is required when realtime is enabled.');
+  } else {
+    try {
+      const parsed = new URL(realtimeUrl);
+      const developmentLoopback =
+        !isProductionCheck &&
+        environment === 'development' &&
+        parsed.protocol === 'http:' &&
+        (parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost');
+      if (
+        (parsed.protocol !== 'https:' && !developmentLoopback) ||
+        parsed.origin !== realtimeUrl ||
+        parsed.pathname !== '/' ||
+        parsed.search ||
+        parsed.hash ||
+        parsed.username ||
+        parsed.password
+      ) {
+        errors.push('NEXT_PUBLIC_REALTIME_URL must be an exact HTTPS origin, except loopback HTTP in development.');
+      }
+    } catch {
+      errors.push('NEXT_PUBLIC_REALTIME_URL must be a valid absolute realtime origin.');
+    }
+  }
+}
 
 if (enabledValue !== undefined && enabledValue !== 'true' && enabledValue !== 'false') {
   errors.push('NEXT_PUBLIC_ANALYTICS_ENABLED must be exactly "true" or "false".');

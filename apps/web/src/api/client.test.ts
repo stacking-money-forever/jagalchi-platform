@@ -34,14 +34,14 @@ describe('api client session ending', () => {
 
     await client.beginAuthSessionEnding();
     refresh.resolve(
-      new Response(JSON.stringify({ accessToken: 'late-token' }), {
+      new Response(JSON.stringify({ authenticated: true }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       }),
     );
     await request;
 
-    expect(client.getAccessToken()).toBeNull();
+    expect(client.hasActiveWebSession()).toBe(false);
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
@@ -60,21 +60,21 @@ describe('api client session ending', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const client = await import('./client');
-    client.setAccessToken('active-token');
+    client.markWebSessionActive();
     const request = client.apiClient.get('/roadmaps').catch((error: unknown) => error);
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
 
     await client.beginAuthSessionEnding();
     client.restoreAuthSessionAfterEnding();
     refresh.resolve(
-      new Response(JSON.stringify({ accessToken: 'late-token' }), {
+      new Response(JSON.stringify({ authenticated: true }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       }),
     );
 
     await expect(request).resolves.toMatchObject({ code: 'SESSION_ENDING' });
-    expect(client.getAccessToken()).toBe('active-token');
+    expect(client.hasActiveWebSession()).toBe(true);
   });
 
   it('does not start a refresh when a protected request receives 401 after ending begins', async () => {
@@ -83,7 +83,7 @@ describe('api client session ending', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const client = await import('./client');
-    client.setAccessToken('active-token');
+    client.markWebSessionActive();
     const request = client.apiClient.get('/roadmaps').catch((error: unknown) => error);
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
     await client.beginAuthSessionEnding();
@@ -97,7 +97,7 @@ describe('api client session ending', () => {
     await request;
 
     expect(fetchMock).toHaveBeenCalledOnce();
-    expect(client.getAccessToken()).toBe('active-token');
+    expect(client.hasActiveWebSession()).toBe(true);
   });
 
   it('allows refresh again only after an explicit session restore', async () => {
@@ -111,7 +111,7 @@ describe('api client session ending', () => {
         }),
       )
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ accessToken: 'restored-token' }), {
+        new Response(JSON.stringify({ authenticated: true }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         }),
@@ -128,7 +128,7 @@ describe('api client session ending', () => {
     await client.beginAuthSessionEnding();
     client.restoreAuthSessionAfterEnding();
     await expect(client.apiClient.get('/roadmaps')).resolves.toEqual({ ok: true });
-    expect(client.getAccessToken()).toBe('restored-token');
+    expect(client.hasActiveWebSession()).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
@@ -195,13 +195,13 @@ describe('api client session ending', () => {
       ).toHaveLength(1),
     );
     refresh.resolve(
-      new Response(JSON.stringify({ accessToken: 'shared-token' }), {
+      new Response(JSON.stringify({ authenticated: true }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       }),
     );
 
-    await expect(hookRefresh).resolves.toEqual({ accessToken: 'shared-token' });
+    await expect(hookRefresh).resolves.toEqual({ authenticated: true });
     await expect(request).resolves.toEqual({ ok: true });
     expect(
       fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/users/auth/refresh')),
@@ -223,7 +223,7 @@ describe('api client session ending', () => {
       if (url.endsWith('/users/auth/refresh')) {
         expect(init?.headers).toMatchObject({ 'X-CSRF-Token': 'csrf-token' });
         return Promise.resolve(
-          new Response(JSON.stringify({ accessToken: 'refreshed-token' }), {
+          new Response(JSON.stringify({ authenticated: true }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
           }),
@@ -253,5 +253,57 @@ describe('api client session ending', () => {
     expect(
       fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/users/auth/refresh')),
     ).toHaveLength(1);
+  });
+
+  it('renews a raced CSRF token and retries a mutation exactly once', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'stale' }), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ code: 'CSRF_TOKEN_INVALID' }), { status: 403 }),
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'current' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = await import('./client');
+    await expect(client.apiClient.post('/users/auth/login', { email: 'a@b.com' })).resolves.toEqual(
+      { ok: true },
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock.mock.calls[1]?.[1]?.headers).toMatchObject({ 'X-CSRF-Token': 'stale' });
+    expect(fetchMock.mock.calls[3]?.[1]?.headers).toMatchObject({ 'X-CSRF-Token': 'current' });
+  });
+
+  it('createCsrfAwareFetch attaches CSRF headers to mutating requests', async () => {
+    const fetchMock = vi.fn<typeof fetch>((input, _init) => {
+      const url = String(input);
+      if (url === '/api/csrf-token') {
+        return Promise.resolve(
+          new Response(JSON.stringify({ token: 'csrf-token' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ id: 'import-1' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = await import('./client');
+    const csrfFetch = client.createCsrfAwareFetch(fetchMock);
+    await csrfFetch('/api/career/target-imports', { method: 'POST', body: '{}' });
+
+    const mutationHeaders = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes('/career/target-imports'),
+    )?.[1]?.headers;
+    expect(mutationHeaders).toBeInstanceOf(Headers);
+    expect((mutationHeaders as Headers).get('X-CSRF-Token')).toBe('csrf-token');
   });
 });

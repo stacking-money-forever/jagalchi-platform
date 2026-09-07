@@ -1,0 +1,123 @@
+import { describe, expect, it } from 'vitest';
+
+import type { ProjectRunProjection } from '@jagalchi/api-client';
+
+import { adaptProjectRunProjection } from './adapt-projection';
+import { computeLayout, UNGROUPED_MILESTONE_ID } from './compute-layout';
+
+const baseRun = {
+  id: 'run-1',
+  state: 'ACTIVE',
+  version: 2,
+  currentTaskId: 't2',
+  recommendedTaskId: 'rec-1',
+  plan: { id: 'plan-1', schemaVersion: 1 },
+  map: {
+    nodes: [
+      { id: 't1', title: 'A', milestoneId: 'm1', state: 'DONE' },
+      { id: 't2', title: 'B', milestoneId: 'm1', state: 'READY' },
+    ],
+    edges: [{ id: 'e1', source: 't1', target: 't2', kind: 'PREREQUISITE' }],
+  },
+  tasks: [
+    {
+      id: 't1',
+      title: 'A',
+      state: 'DONE',
+      required: true,
+      milestoneId: 'm1',
+      prerequisiteIds: [],
+      purpose: 'p1',
+      acceptanceCriteria: ['ac1'],
+      evidenceRequirements: ['PR'],
+      citationIds: ['c1'],
+      gapIds: ['g1'],
+    },
+    {
+      id: 't2',
+      title: 'B',
+      state: 'READY',
+      required: true,
+      milestoneId: 'm1',
+      prerequisiteIds: ['t1'],
+      purpose: 'p2',
+      acceptanceCriteria: ['ac2'],
+      evidenceRequirements: ['PR', 'CHANGED_PATH:src'],
+      verificationFailure: { code: 'RULE_FAIL', note: 'missing path' },
+    },
+  ],
+  citations: [{ id: 'c1', label: 'Req label', quote: 'quote' }],
+  gaps: [{ id: 'g1', description: 'Gap desc' }],
+  proof: {
+    summary: 'summary',
+    validUntil: null,
+    publication: { state: 'UNPUBLISHED', publicId: null },
+    verification: { state: 'PENDING', verifiedAt: null },
+    facts: {
+      snapshotId: 'snap-1',
+      verificationLevel: 'MACHINE_VERIFIED',
+      provider: 'fixture',
+      repositoryId: 'repo-1',
+      pullNumber: 1,
+      headSha: 'abc',
+      observedAt: '2026-01-01T00:00:00.000Z',
+      evaluations: [{ ruleId: 'rule-0', type: 'MERGED_PR', passed: true, code: 'OK' }],
+    },
+  },
+} satisfies ProjectRunProjection;
+
+describe('adaptProjectRunProjection', () => {
+  it('maps milestones, citations, gaps, and verification failure', () => {
+    const model = adaptProjectRunProjection(baseRun);
+    expect(model.milestones).toEqual([{ id: 'm1', title: '단계 1' }]);
+    expect(model.tasks[0]?.citationLabels).toEqual(['Req label']);
+    expect(model.tasks[0]?.gapLabels).toEqual(['Gap desc']);
+    expect(model.tasks[1]?.blockedReason).toBe('missing path');
+    expect(model.tasks[1]?.evidenceCount).toBe(1);
+    expect(model.proof?.verification).toBe('PENDING');
+    expect(model.recommendedTaskId).toBe('rec-1');
+  });
+
+  it('uses projection.milestones titles when BE provides them', () => {
+    const withTitles: ProjectRunProjection = {
+      ...baseRun,
+      milestones: [{ id: 'm1', title: '인증 기반 구축' }],
+    };
+    const model = adaptProjectRunProjection(withTitles);
+    expect(model.milestones).toEqual([{ id: 'm1', title: '인증 기반 구축' }]);
+  });
+
+  it('retains nullable-milestone tasks and keeps empty stages finite and not proof-ready', () => {
+    const model = adaptProjectRunProjection({
+      ...baseRun,
+      currentTaskId: 'ungrouped',
+      milestones: [{ id: 'empty', title: '빈 단계' }],
+      tasks: [{ ...baseRun.tasks[0], id: 'ungrouped', milestoneId: null, state: 'READY' }],
+    });
+    const layout = computeLayout(model, [], []);
+
+    expect(model.tasks).toHaveLength(1);
+    expect(model.tasks[0]?.milestoneId).toBeNull();
+    expect(layout.nodes.find((node) => node.id === 'ungrouped')?.parentId).toBe(
+      UNGROUPED_MILESTONE_ID,
+    );
+    expect(layout.nodes.find((node) => node.id === 'empty')?.position).toEqual(
+      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+    );
+    expect(layout.nodes.find((node) => node.id === 'proof')?.data.doneCount).toBe(0);
+  });
+
+  it('normalizes an unknown milestone id into the ungrouped map container', () => {
+    const model = adaptProjectRunProjection({
+      ...baseRun,
+      milestones: [{ id: 'known', title: '알려진 단계' }],
+      tasks: [{ ...baseRun.tasks[0], id: 'orphaned', milestoneId: 'missing-stage' }],
+    });
+    const layout = computeLayout(model, [], []);
+
+    expect(layout.nodes.find((node) => node.id === 'orphaned')?.parentId).toBe(
+      UNGROUPED_MILESTONE_ID,
+    );
+    expect(layout.nodes.find((node) => node.id === UNGROUPED_MILESTONE_ID)).toBeDefined();
+  });
+});

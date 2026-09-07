@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 
 import { usePathname } from 'next/navigation';
 
@@ -16,7 +16,7 @@ interface AnalyticsProviderProps {
 
 let lastCapturedPathname: string | null = null;
 
-export function AnalyticsProvider({ children }: AnalyticsProviderProps) {
+function AnalyticsObserver() {
   const pathname = usePathname();
   const authInitialized = useAtomValue(isAuthInitializedAtom);
   const isAuthenticated = useAtomValue(isAuthenticatedAtom);
@@ -51,5 +51,16 @@ export function AnalyticsProvider({ children }: AnalyticsProviderProps) {
     };
   }, [authInitialized, isAuthenticated, pathname, userId]);
 
-  return <>{children}</>;
+  return null;
+}
+
+export function AnalyticsProvider({ children }: AnalyticsProviderProps) {
+  return (
+    <>
+      {children}
+      <Suspense fallback={null}>
+        <AnalyticsObserver />
+      </Suspense>
+    </>
+  );
 }

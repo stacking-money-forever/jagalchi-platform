@@ -38,7 +38,7 @@ export function useRealtime({
 
   useEffect(() => {
     if (!isAutoConnect || !roadmapId) return;
-    connectRealtime({
+    void connectRealtime({
       roadmapId,
       onConnect: () => setIsConnected(true),
       onDisconnect: () => setIsConnected(false),

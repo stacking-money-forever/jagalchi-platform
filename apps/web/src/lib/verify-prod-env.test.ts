@@ -6,11 +6,14 @@ import { describe, expect, it } from 'vitest';
 const script = resolve(process.cwd(), 'scripts/verify-prod-env.mjs');
 
 const productionFeatureFlags = {
-  NEXT_PUBLIC_AI_FEATURES_ENABLED: 'true',
   NEXT_PUBLIC_REALTIME_ENABLED: 'true',
   NEXT_PUBLIC_EVIDENCE_EXECUTION_ENABLED: 'true',
   NEXT_PUBLIC_PROOF_PROFILE_ENABLED: 'true',
   NEXT_PUBLIC_OAUTH_ENABLED: 'true',
+};
+
+const realtimeProductionEnv = {
+  NEXT_PUBLIC_REALTIME_URL: 'https://realtime.example.com',
 };
 
 function verify(env: Record<string, string>, args: string[] = []) {
@@ -18,6 +21,7 @@ function verify(env: Record<string, string>, args: string[] = []) {
   for (const flag of Object.keys(productionFeatureFlags)) {
     delete childEnvironment[flag];
   }
+  delete childEnvironment.NEXT_PUBLIC_REALTIME_URL;
   return spawnSync(process.execPath, [script, ...args], {
     env: { ...childEnvironment, ...env },
     encoding: 'utf8',
@@ -85,6 +89,7 @@ describe('verify-prod-env analytics gate', () => {
             NEXT_PUBLIC_POSTHOG_HOST: 'https://us.i.posthog.com',
             NEXT_PUBLIC_API_URL: '/api',
             API_ORIGIN: 'https://api.example.com',
+            ...realtimeProductionEnv,
           },
           args,
         );
@@ -107,6 +112,7 @@ describe('verify-prod-env analytics gate', () => {
       NEXT_PUBLIC_POSTHOG_HOST: 'https://us.i.posthog.com',
       NEXT_PUBLIC_API_URL: '/api',
       API_ORIGIN: 'https://api.example.com',
+      ...realtimeProductionEnv,
       ...productionFeatureFlags,
     });
     expect(result.status).toBe(1);
@@ -116,7 +122,6 @@ describe('verify-prod-env analytics gate', () => {
   });
 
   it.each([
-    'NEXT_PUBLIC_AI_FEATURES_ENABLED',
     'NEXT_PUBLIC_REALTIME_ENABLED',
     'NEXT_PUBLIC_EVIDENCE_EXECUTION_ENABLED',
     'NEXT_PUBLIC_PROOF_PROFILE_ENABLED',
@@ -129,6 +134,7 @@ describe('verify-prod-env analytics gate', () => {
       NEXT_PUBLIC_ANALYTICS_ENABLED: 'false',
       NEXT_PUBLIC_API_URL: '/api',
       API_ORIGIN: 'https://api.example.com',
+      ...realtimeProductionEnv,
       NEXT_PUBLIC_API_MOCKING: 'false',
       ...withoutFlag,
     });
@@ -137,7 +143,6 @@ describe('verify-prod-env analytics gate', () => {
   });
 
   it.each([
-    'NEXT_PUBLIC_AI_FEATURES_ENABLED',
     'NEXT_PUBLIC_REALTIME_ENABLED',
     'NEXT_PUBLIC_EVIDENCE_EXECUTION_ENABLED',
     'NEXT_PUBLIC_PROOF_PROFILE_ENABLED',
@@ -148,6 +153,7 @@ describe('verify-prod-env analytics gate', () => {
       NEXT_PUBLIC_ANALYTICS_ENABLED: 'false',
       NEXT_PUBLIC_API_URL: '/api',
       API_ORIGIN: 'https://api.example.com',
+      ...realtimeProductionEnv,
       NEXT_PUBLIC_API_MOCKING: 'false',
       ...productionFeatureFlags,
       [flag]: 'yes',
@@ -162,10 +168,49 @@ describe('verify-prod-env analytics gate', () => {
       NEXT_PUBLIC_ANALYTICS_ENABLED: 'false',
       NEXT_PUBLIC_API_URL: '/api',
       API_ORIGIN: 'https://api.example.com',
+      ...realtimeProductionEnv,
       NEXT_PUBLIC_API_MOCKING: 'false',
       ...productionFeatureFlags,
     });
     expect(result.status).toBe(0);
+  });
+
+  it.each([
+    [undefined, 'is required'],
+    ['http://realtime.example.com', 'exact HTTPS origin'],
+    ['https://realtime.example.com/socket', 'exact HTTPS origin'],
+    ['https://user:pass@realtime.example.com', 'exact HTTPS origin'],
+  ])('rejects invalid realtime origin %s when enabled', (realtimeUrl, message) => {
+    const env: Record<string, string> = {
+      NEXT_PUBLIC_ENV: 'production',
+      NEXT_PUBLIC_ANALYTICS_ENABLED: 'false',
+      NEXT_PUBLIC_API_URL: '/api',
+      API_ORIGIN: 'https://api.example.com',
+      NEXT_PUBLIC_API_MOCKING: 'false',
+      ...productionFeatureFlags,
+    };
+    if (realtimeUrl) env.NEXT_PUBLIC_REALTIME_URL = realtimeUrl;
+    const result = verify(env);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(message);
+  });
+
+  it('allows exact loopback HTTP realtime only in development', () => {
+    const development = verify({
+      NEXT_PUBLIC_ENV: 'development',
+      NEXT_PUBLIC_ANALYTICS_ENABLED: 'false',
+      NEXT_PUBLIC_REALTIME_ENABLED: 'true',
+      NEXT_PUBLIC_REALTIME_URL: 'http://127.0.0.1:8080',
+    });
+    expect(development.status).toBe(0);
+
+    const staging = verify({
+      NEXT_PUBLIC_ENV: 'staging',
+      NEXT_PUBLIC_ANALYTICS_ENABLED: 'false',
+      NEXT_PUBLIC_REALTIME_ENABLED: 'true',
+      NEXT_PUBLIC_REALTIME_URL: 'http://127.0.0.1:8080',
+    });
+    expect(staging.status).toBe(1);
   });
 
   it('rejects a direct browser-to-API URL in production', () => {

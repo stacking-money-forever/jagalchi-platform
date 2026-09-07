@@ -1,9 +1,7 @@
-import { Buffer } from 'node:buffer';
-
 import { createStore } from 'jotai';
 import { describe, expect, it } from 'vitest';
 
-import { getAccessToken } from '@/api/client';
+import { hasActiveWebSession } from '@/api/client';
 
 import {
   currentUserEmailAtom,
@@ -16,29 +14,23 @@ import {
   logoutAtom,
 } from './auth.atoms';
 
-function toBase64Url(value: Record<string, unknown>): string {
-  return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
-}
-
-function createToken(payload: Record<string, unknown>): string {
-  return [toBase64Url({ alg: 'none', typ: 'JWT' }), toBase64Url(payload), 'signature'].join('.');
-}
-
 describe('auth atoms', () => {
-  it('initializes current user state from login token and clears it on logout', () => {
+  it('initializes current user state from sanitized session and clears it on logout', () => {
     const store = createStore();
-    const token = createToken({
-      id: 1,
-      email: 'kim@example.com',
-      name: '김선배',
-      role: 'STUDENT',
-      sub: 'user-1',
-    });
+    const session = {
+      authenticated: true as const,
+      user: {
+        id: '1',
+        email: 'kim@example.com',
+        name: '김선배',
+        roles: ['STUDENT'],
+      },
+    };
 
-    store.set(loginAtom, token);
+    store.set(loginAtom, session);
 
     expect(store.get(isAuthenticatedAtom)).toBe(true);
-    expect(getAccessToken()).toBe(token);
+    expect(hasActiveWebSession()).toBe(true);
     expect(store.get(currentUserEmailAtom)).toBe('kim@example.com');
     expect(store.get(currentUserIdAtom)).toBe('1');
     expect(store.get(currentUserNameAtom)).toBe('김선배');
@@ -48,7 +40,7 @@ describe('auth atoms', () => {
     store.set(logoutAtom);
 
     expect(store.get(isAuthenticatedAtom)).toBe(false);
-    expect(getAccessToken()).toBeNull();
+    expect(hasActiveWebSession()).toBe(false);
     expect(store.get(currentUserEmailAtom)).toBeNull();
     expect(store.get(currentUserIdAtom)).toBeNull();
     expect(store.get(currentUserNameAtom)).toBeNull();

@@ -3,12 +3,10 @@
 import { useState, useSyncExternalStore } from 'react';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useAtomValue } from 'jotai';
 import { CheckCircle2, LockKeyhole, RotateCcw, Smartphone } from 'lucide-react';
 
 import { getTicketPurchaseContext } from '@/api/tickets';
 import { Button } from '@/components/ui/button';
-import { accessTokenAtom } from '@/lib/auth-atoms';
 import { hasNativeBridge, NativeBridgeError, requestNative } from '@/lib/native-bridge';
 
 import type { TicketPack } from '../types';
@@ -49,7 +47,9 @@ const priceFormatter = new Intl.NumberFormat('ko-KR', {
 const subscribe = () => () => {};
 
 export function TicketCheckout({ pack }: { pack: TicketPack }) {
-  const accessToken = useAtomValue(accessTokenAtom);
+  // The web session is HttpOnly and must never be forwarded through the native bridge.
+  // Native purchase stays disabled until the native shell owns a SecureStore token session.
+  const nativeAccessToken: string | null = null;
   const queryClient = useQueryClient();
   const native = useSyncExternalStore(subscribe, hasNativeBridge, () => false);
   const [busy, setBusy] = useState<'purchase' | 'restore' | null>(null);
@@ -58,7 +58,7 @@ export function TicketCheckout({ pack }: { pack: TicketPack }) {
   const context = useQuery({
     queryKey: ['tickets', 'purchase-context'],
     queryFn: getTicketPurchaseContext,
-    enabled: native && Boolean(accessToken),
+    enabled: native && Boolean(nativeAccessToken),
   });
 
   const products = useQuery({
@@ -81,14 +81,14 @@ export function TicketCheckout({ pack }: { pack: TicketPack }) {
   };
 
   const purchase = async () => {
-    if (!accessToken || !context.data || !productAvailable) return;
+    if (!nativeAccessToken || !context.data || !productAvailable) return;
     setBusy('purchase');
     setError(null);
     setNotice(null);
     try {
       const result = await requestNative<PurchaseResult>('purchase', {
         productId: pack.storeProductId,
-        accessToken,
+        accessToken: nativeAccessToken,
         appleAppAccountToken: context.data.appleAppAccountToken,
         googleObfuscatedAccountId: context.data.googleObfuscatedAccountId,
       });
@@ -114,12 +114,14 @@ export function TicketCheckout({ pack }: { pack: TicketPack }) {
   };
 
   const restore = async () => {
-    if (!accessToken) return;
+    if (!nativeAccessToken) return;
     setBusy('restore');
     setError(null);
     setNotice(null);
     try {
-      const result = await requestNative<RestoreResult>('restore-purchases', { accessToken });
+      const result = await requestNative<RestoreResult>('restore-purchases', {
+        accessToken: nativeAccessToken,
+      });
       await refreshWallet();
       const recovered = result.items.filter((item) => item.state !== 'pending').length;
       const pending = result.items.length - recovered;
@@ -204,15 +206,15 @@ export function TicketCheckout({ pack }: { pack: TicketPack }) {
         intent="ticket"
         size="lg"
         className="mt-6 w-full"
-        disabled={!native || !accessToken || !context.data || !productAvailable}
+        disabled={!native || !nativeAccessToken || !context.data || !productAvailable}
         loading={(native && products.isPending) || busy === 'purchase'}
         loadingLabel={native && products.isPending ? '스토어 상품 확인 중…' : '결제 확인 중…'}
         onClick={() => void purchase()}
       >
         {!native
           ? '모바일 앱에서 구매 가능'
-          : !accessToken
-            ? '로그인 후 구매 가능'
+          : !nativeAccessToken
+            ? '네이티브 세션 전환 후 구매 가능'
             : `${displayPrice} 결제하기`}
       </Button>
       {native ? (
@@ -223,7 +225,7 @@ export function TicketCheckout({ pack }: { pack: TicketPack }) {
           className="mt-2 w-full"
           loading={busy === 'restore'}
           loadingLabel="구매 복원 중…"
-          disabled={!accessToken || busy !== null}
+          disabled={!nativeAccessToken || busy !== null}
           onClick={() => void restore()}
         >
           <RotateCcw aria-hidden="true" />

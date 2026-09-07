@@ -20,7 +20,9 @@ async function requestNativeOAuth(authorizationUrl: string): Promise<string> {
   return result.callbackUrl;
 }
 
-export async function beginOAuth(authorizationUrl: string): Promise<string | null> {
+export async function beginOAuth(
+  authorizationUrl: string,
+): Promise<Awaited<ReturnType<typeof exchangeOAuthCode>> | null> {
   if (!hasNativeBridge()) {
     window.location.assign(authorizationUrl);
     return null;
@@ -30,5 +32,5 @@ export async function beginOAuth(authorizationUrl: string): Promise<string | nul
   if (!code) throw new Error('OAuth 완료 코드가 누락되었습니다.');
   const result = await exchangeOAuthCode(code);
   capture('oauth_completed', {});
-  return result.accessToken;
+  return result;
 }

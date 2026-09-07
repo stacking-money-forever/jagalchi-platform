@@ -4,21 +4,19 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 import { useAtomValue } from 'jotai';
-import { Bell, Search, UserRound } from 'lucide-react';
+import { Search, UserRound } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { isAuthenticatedAtom } from '@/lib/auth-atoms';
 import { isEnabled } from '@/lib/feature-flags';
 
 const headerLinks = [
-  { label: '홈', href: '/' },
-  ...(isEnabled('EVIDENCE_EXECUTION_ENABLED') ? [{ label: '목표 공고', href: '/career' }] : []),
-  { label: '실행 과제', href: '/myroadmap' },
-  { label: '과제 템플릿', href: '/explore' },
+  { label: '내 프로젝트', href: '/myroadmap' },
+  { label: '라이브러리', href: '/library' },
 ] as const;
 
 const focusRing =
-  'transition-transform active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface';
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface';
 
 export function ProductHeader() {
   const isAuthenticated = useAtomValue(isAuthenticatedAtom);
@@ -51,6 +49,15 @@ export function ProductHeader() {
           </ul>
         </nav>
 
+        {isEnabled('EVIDENCE_EXECUTION_ENABLED') && isEnabled('PROJECT_RUNS_ENABLED') ? (
+          <Link
+            className={`min-h-touch bg-primary text-primary-foreground hover:bg-primary/90 hidden items-center rounded-md px-3 text-[13px] font-bold transition-colors md:inline-flex ${focusRing}`}
+            href="/projects/new"
+          >
+            프로젝트 만들기
+          </Link>
+        ) : null}
+
         <Link
           aria-label="실전 과제 검색"
           className={`min-h-touch border-border bg-surface text-muted-foreground hover:bg-muted hover:text-foreground ml-auto hidden min-w-0 flex-1 items-center gap-2 rounded-full border px-4 text-[13px] transition-colors md:flex lg:max-w-xs ${focusRing}`}
@@ -64,15 +71,7 @@ export function ProductHeader() {
         <ThemeToggle />
 
         <Link
-          aria-label="알림"
-          className={`size-touch text-muted-foreground hover:bg-muted hover:text-foreground hidden shrink-0 items-center justify-center rounded-full transition-colors sm:flex ${focusRing}`}
-          href="/activity"
-        >
-          <Bell aria-hidden="true" className="size-5" />
-        </Link>
-
-        <Link
-          aria-label={isAuthenticated ? '내 프로필' : '로그인'}
+          aria-label={isAuthenticated ? '내 계정' : '로그인'}
           className={`size-touch bg-primary-subtle text-primary hover:bg-primary-subtle/70 flex shrink-0 items-center justify-center rounded-full transition-colors ${focusRing}`}
           href={isAuthenticated ? '/profile' : '/login'}
         >

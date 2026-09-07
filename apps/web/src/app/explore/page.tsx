@@ -37,7 +37,7 @@ function topicHref(topic: string, query: string) {
   return queryString ? `/explore?${queryString}` : '/explore';
 }
 
-export default async function ExplorePage({
+async function ExplorePageContent({
   searchParams,
 }: {
   searchParams: Promise<ExploreSearchParams>;
@@ -142,5 +142,23 @@ export default async function ExplorePage({
         </aside>
       </div>
     </AppShell>
+  );
+}
+
+export default function ExplorePage({
+  searchParams,
+}: {
+  searchParams: Promise<ExploreSearchParams>;
+}) {
+  return (
+    <Suspense
+      fallback={
+        <AppShell activeTab="explore">
+          <p className="text-muted-foreground p-8 text-sm">과제 템플릿을 준비하고 있어요…</p>
+        </AppShell>
+      }
+    >
+      <ExplorePageContent searchParams={searchParams} />
+    </Suspense>
   );
 }

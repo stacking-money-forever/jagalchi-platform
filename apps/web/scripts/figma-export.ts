@@ -92,13 +92,6 @@ const FALLBACK_FIGMA_COMPONENTS: Record<string, FigmaComponent> = {
     nodeId: '2-3',
     fileKey: process.env.FIGMA_FILE_KEY || '',
   },
-
-  // AI Features
-  'RoadmapAiModal-Default': {
-    name: 'AI Modal',
-    nodeId: '3-1',
-    fileKey: process.env.FIGMA_FILE_KEY || '',
-  },
 };
 
 /**

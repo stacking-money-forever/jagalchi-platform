@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 
 import { useAtomValue } from 'jotai';
-import { ArrowLeft, GitFork, Search, Sparkles } from 'lucide-react';
+import { ArrowLeft, GitFork, Search } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,17 +15,14 @@ import { isAuthenticatedAtom } from '@/lib/auth-atoms';
 interface RoadmapHeaderProps {
   roadmapId?: string;
   roadmapTitle?: string;
-  onAiFeedback?: () => void;
 }
 
 export function RoadmapHeader({
   roadmapId = '',
   roadmapTitle = VIEWER_MESSAGES.DEFAULT_ROADMAP_TITLE,
-  onAiFeedback,
 }: RoadmapHeaderProps) {
   const router = useRouter();
   const isAuthenticated = useAtomValue(isAuthenticatedAtom);
-  const aiEnabled = process.env.NEXT_PUBLIC_AI_FEATURES_ENABLED === 'true';
   const { data: forkStatus } = useForkStatus(roadmapId);
   const { mutate: forkRoadmap, isPending: isForkPending } = useForkRoadmap();
 
@@ -83,16 +80,6 @@ export function RoadmapHeader({
             ? VIEWER_MESSAGES.FORK_ALREADY_FORKED
             : VIEWER_MESSAGES.FORK_BUTTON}
         </Button>
-        {aiEnabled && onAiFeedback ? (
-          <Button
-            onClick={onAiFeedback}
-            intent="neutral"
-            className="h-9 rounded-lg px-4 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-offset-2"
-          >
-            <Sparkles className="mr-1.5 h-4 w-4" />
-            {VIEWER_MESSAGES.AI_FEEDBACK_BUTTON}
-          </Button>
-        ) : null}
       </div>
     </header>
   );

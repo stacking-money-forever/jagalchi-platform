@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const bridge = vi.hoisted(() => ({
@@ -13,10 +13,6 @@ const api = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock('jotai', async () => {
-  const actual = await vi.importActual<typeof import('jotai')>('jotai');
-  return { ...actual, useAtomValue: () => 'access-token' };
-});
 vi.mock('@/api/tickets', () => api);
 vi.mock('@/lib/native-bridge', async () => {
   const actual = await vi.importActual<typeof import('@/lib/native-bridge')>('@/lib/native-bridge');
@@ -69,25 +65,19 @@ describe('TicketCheckout', () => {
     });
   });
 
-  it('uses the store localized price and sends account-bound purchase data', async () => {
+  it('uses the localized store price but never forwards the web session to native', async () => {
     renderCheckout();
-    const purchase = await screen.findByRole('button', { name: '₩3,900 결제하기' });
-    await waitFor(() => expect(purchase).toBeEnabled());
-    fireEvent.click(purchase);
-
-    expect(await screen.findByText(/결제 승인을 기다리고 있어요/)).toBeInTheDocument();
-    expect(bridge.requestNative).toHaveBeenCalledWith('purchase', {
-      productId: TICKET_PACKS[0].storeProductId,
-      accessToken: 'access-token',
-      appleAppAccountToken: '00000000-0000-4000-8000-000000000001',
-      googleObfuscatedAccountId: 'a'.repeat(64),
-    });
+    expect(await screen.findByText('₩3,900')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: '네이티브 세션 전환 후 구매 가능' }),
+    ).toBeDisabled();
+    expect(bridge.requestNative).not.toHaveBeenCalledWith('purchase', expect.anything());
   });
 
-  it('treats empty restore as a valid result without minting tickets', async () => {
+  it('keeps restore disabled until the native shell owns a SecureStore session', async () => {
     renderCheckout();
-    fireEvent.click(await screen.findByRole('button', { name: '구매 복원' }));
-    expect(await screen.findByText(/복원할 미완료 구매가 없어요/)).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '구매 복원' })).toBeDisabled();
+    expect(bridge.requestNative).not.toHaveBeenCalledWith('restore-purchases', expect.anything());
   });
 
   it('disables purchase when the approved SKU is unavailable', async () => {
@@ -99,6 +89,6 @@ describe('TicketCheckout', () => {
     });
     renderCheckout();
     expect(await screen.findByText('스토어 상품을 불러오지 못했습니다.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /결제하기/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '네이티브 세션 전환 후 구매 가능' })).toBeDisabled();
   });
 });

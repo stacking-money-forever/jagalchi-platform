@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAtomValue } from 'jotai';
 
 import type { RoadmapListParams } from '@/api/roadmap';
-import { listOwnedRoadmaps } from '@/api/roadmap-domain';
+import { isReadOnlyProjectRunRoadmap, listOwnedRoadmaps } from '@/api/roadmap-domain';
 import { isAuthenticatedAtom } from '@/lib/auth-atoms';
 import { queryKeys } from '@/lib/query-keys';
 
@@ -13,5 +13,13 @@ export function useRoadmaps(params: RoadmapListParams = {}) {
     queryFn: () => listOwnedRoadmaps(params),
     enabled: authenticated,
     placeholderData: (previousData) => previousData,
+    select: (roadmaps) => {
+      const items = roadmaps.items.filter((roadmap) => !isReadOnlyProjectRunRoadmap(roadmap));
+      return {
+        ...roadmaps,
+        items,
+        total: Math.max(0, roadmaps.total - (roadmaps.items.length - items.length)),
+      };
+    },
   });
 }

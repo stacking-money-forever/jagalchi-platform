@@ -1,7 +1,7 @@
 import { atom } from 'jotai';
 
-/** 액세스 토큰 atom — 메모리에만 저장 (XSS 방어) */
-export const accessTokenAtom = atom<string | null>(null);
+/** HttpOnly 웹 세션이 확인됐는지 나타내는 UI 상태. 비밀값을 포함하지 않는다. */
+export const sessionPresentAtom = atom<boolean>(false);
 
 /** 현재 로그인한 사용자 이름 — JWT payload에서 추출 */
 export const currentUserNameAtom = atom<string | null>(null);
@@ -23,6 +23,5 @@ export const isAuthInitializedAtom = atom<boolean>(false);
 
 /** 현재 로그인 상태 (토큰 존재 여부 기반) */
 export const isAuthenticatedAtom = atom<boolean>((get) => {
-  const token = get(accessTokenAtom);
-  return token !== null;
+  return get(sessionPresentAtom);
 });

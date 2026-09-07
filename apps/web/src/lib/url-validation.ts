@@ -1,3 +1,5 @@
+import { isUploadContentPath } from './upload-content-path';
+
 const ALLOWED_PROTOCOLS = ['https:', 'http:'];
 
 /**
@@ -10,6 +12,8 @@ const ALLOWED_PROTOCOLS = ['https:', 'http:'];
 export function sanitizeUrl(url: string): string {
   const trimmed = url.trim();
   if (!trimmed) return '#';
+  if (isUploadContentPath(trimmed)) return trimmed;
+  if (trimmed.startsWith('/')) return '#';
 
   try {
     // Add https:// if no protocol specified

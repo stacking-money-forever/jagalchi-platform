@@ -30,7 +30,7 @@ export function CurrentLessonCard({
         <p className="text-primary-foreground/70 text-[13px] font-semibold">{roadmap}</p>
         <h1
           id={headingId}
-          className="max-w-2xl text-[30px] leading-[1.25] font-extrabold tracking-tight"
+          className="max-w-2xl text-2xl leading-[1.25] font-extrabold tracking-tight sm:text-3xl"
         >
           {title}
         </h1>

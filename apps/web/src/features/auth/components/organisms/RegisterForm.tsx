@@ -131,9 +131,9 @@ export function RegisterForm({ onStepChange }: RegisterFormProps) {
     setOauthError(null);
     setActiveOAuthProvider(provider);
     try {
-      const accessToken = await beginOAuth(authorizationUrl);
-      if (accessToken) {
-        setLogin(accessToken);
+      const session = await beginOAuth(authorizationUrl);
+      if (session) {
+        setLogin(session);
         router.replace('/');
       }
     } catch (error) {

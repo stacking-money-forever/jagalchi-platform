@@ -1,8 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-import { ATTACHMENT_UPLOAD_CONSTRAINTS } from '@/constants/upload';
-
 // fetch는 모듈 로드 전에 stubGlobal 로 설정
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
@@ -56,20 +54,6 @@ function makeOkFetchResponse(status = 200) {
       headers: { 'content-type': 'application/json' },
     }),
   );
-}
-
-function makeUploadRequest(file?: File) {
-  const formData = new FormData();
-  if (file) formData.set('file', file);
-
-  const request = makeRequest('POST', '/api/uploads/attachments', {
-    origin: VALID_ORIGIN,
-    csrfCookie: VALID_CSRF,
-    csrfHeader: VALID_CSRF,
-  });
-
-  vi.spyOn(request, 'formData').mockResolvedValue(formData);
-  return request;
 }
 
 const VALID_ORIGIN = 'http://localhost:3000'; // NODE_ENV=test → IS_PRODUCTION=false → 허용
@@ -239,59 +223,6 @@ describe('POST /api/[...path] (state-mutating method)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// POST /uploads/attachments — 서버 측 업로드 검증
-// ---------------------------------------------------------------------------
-
-describe('POST /api/uploads/attachments', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockFetch.mockReturnValue(makeOkFetchResponse(201));
-  });
-
-  it('유효한 첨부 파일은 upstream 으로 FormData 프록시된다', async () => {
-    const req = makeUploadRequest(new File(['lesson'], 'lesson.pdf', { type: 'application/pdf' }));
-    const res = await POST(req);
-
-    expect(res.status).toBe(201);
-    expect(mockFetch).toHaveBeenCalledOnce();
-
-    const [, init] = mockFetch.mock.calls[0] as [string, { body?: unknown; headers?: unknown }];
-    expect(init.body).toBeInstanceOf(FormData);
-    expect(new Headers(init.headers as never).get('content-type')).toBeNull();
-  });
-
-  it('file 필드가 없으면 400 FILE_REQUIRED를 반환한다', async () => {
-    const res = await POST(makeUploadRequest());
-
-    expect(res.status).toBe(400);
-    expect(mockFetch).not.toHaveBeenCalled();
-    await expect(res.json()).resolves.toMatchObject({ code: 'FILE_REQUIRED' });
-  });
-
-  it('허용되지 않은 MIME 타입이면 415 UNSUPPORTED_MEDIA_TYPE을 반환한다', async () => {
-    const req = makeUploadRequest(new File(['html'], 'bad.html', { type: 'text/html' }));
-    const res = await POST(req);
-
-    expect(res.status).toBe(415);
-    expect(mockFetch).not.toHaveBeenCalled();
-    await expect(res.json()).resolves.toMatchObject({ code: 'UNSUPPORTED_MEDIA_TYPE' });
-  });
-
-  it('크기 제한을 넘으면 413 FILE_SIZE_EXCEEDED를 반환한다', async () => {
-    const req = makeUploadRequest(
-      new File([new Uint8Array(ATTACHMENT_UPLOAD_CONSTRAINTS.maxSizeBytes + 1)], 'large.pdf', {
-        type: 'application/pdf',
-      }),
-    );
-    const res = await POST(req);
-
-    expect(res.status).toBe(413);
-    expect(mockFetch).not.toHaveBeenCalled();
-    await expect(res.json()).resolves.toMatchObject({ code: 'FILE_SIZE_EXCEEDED' });
-  });
-});
-
-// ---------------------------------------------------------------------------
 // PUT / PATCH / DELETE — CSRF 검증 필요 (POST 와 동일 검증 경로)
 // ---------------------------------------------------------------------------
 
@@ -407,16 +338,47 @@ describe('sanitizeRequestHeaders', () => {
     const headers = new Headers(init.headers);
     expect(headers.get('x-real-ip')).toBeNull();
   });
-
-  it('일반 커스텀 헤더는 upstream 에 전달된다', async () => {
+  it('upstream 압축 해제 후 헤더 불일치를 막도록 identity 인코딩을 요청한다', async () => {
     const req = makeRequest('GET', '/api/v1/test', {
-      extraHeaders: { authorization: 'Bearer token123' },
+      extraHeaders: { 'accept-encoding': 'gzip, deflate, br' },
     });
     await GET(req);
 
     const [, init] = mockFetch.mock.calls[0] as [string, any];
     const headers = new Headers(init.headers);
-    expect(headers.get('authorization')).toBe('Bearer token123');
+    expect(headers.get('accept-encoding')).toBe('identity');
+  });
+
+  it('브라우저가 보낸 Authorization과 native 식별자는 제거한다', async () => {
+    const req = makeRequest('GET', '/api/v1/test', {
+      extraHeaders: {
+        authorization: 'Bearer attacker-token',
+        'x-jagalchi-client': 'native',
+        'x-native-client': '1',
+      },
+    });
+    await GET(req);
+
+    const [, init] = mockFetch.mock.calls[0] as [string, any];
+    const headers = new Headers(init.headers);
+    expect(headers.get('authorization')).toBeNull();
+    expect(headers.get('x-jagalchi-client')).toBeNull();
+    expect(headers.get('x-native-client')).toBeNull();
+  });
+
+  it('HttpOnly access cookie만 Nest Bearer로 변환하고 cookie는 전달하지 않는다', async () => {
+    const req = makeRequest('GET', '/api/v1/test', {
+      extraHeaders: {
+        cookie: 'jagalchi_access=trusted-token; jagalchi-session=1',
+        authorization: 'Bearer attacker-token',
+      },
+    });
+    await GET(req);
+
+    const [, init] = mockFetch.mock.calls[0] as [string, any];
+    const headers = new Headers(init.headers);
+    expect(headers.get('authorization')).toBe('Bearer trusted-token');
+    expect(headers.get('cookie')).toBeNull();
   });
 });
 
@@ -471,10 +433,10 @@ describe('에러 응답', () => {
 });
 
 // ---------------------------------------------------------------------------
-// CORS 헤더 제거 (stripCorsHeaders)
+// 응답 헤더 정리
 // ---------------------------------------------------------------------------
 
-describe('CORS 헤더 제거', () => {
+describe('응답 헤더 정리', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -501,6 +463,30 @@ describe('CORS 헤더 제거', () => {
     expect(res.headers.get('access-control-allow-credentials')).toBeNull();
     expect(res.headers.get('access-control-allow-methods')).toBeNull();
     expect(res.headers.get('access-control-allow-headers')).toBeNull();
+  });
+
+  it('자동 압축 해제된 body와 충돌하는 framing 헤더를 제거하고 cookie는 보존한다', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ accessToken: 'token' }), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+          'content-encoding': 'gzip',
+          'content-length': '87',
+          'transfer-encoding': 'chunked',
+          'set-cookie':
+            'jagalchi_refresh=value; Path=/api/users/auth; HttpOnly; Secure; SameSite=Lax',
+        },
+      }),
+    );
+
+    const res = await GET(makeRequest('GET', '/api/v1/test'));
+
+    expect(res.headers.get('content-encoding')).toBeNull();
+    expect(res.headers.get('content-length')).toBeNull();
+    expect(res.headers.get('transfer-encoding')).toBeNull();
+    expect(res.headers.get('set-cookie')).toContain('jagalchi_refresh=');
+    await expect(res.json()).resolves.toEqual({ accessToken: 'token' });
   });
 });
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { use } from 'react';
+import { Suspense, use } from 'react';
 
 import dynamic from 'next/dynamic';
 
@@ -16,8 +16,16 @@ interface EditorPageProps {
   params: Promise<{ id: string }>;
 }
 
-export default function EditorPage({ params }: EditorPageProps) {
+function EditorContent({ params }: EditorPageProps) {
   const { id } = use(params);
 
   return <RoadmapEditorPage roadmapId={id} />;
+}
+
+export default function EditorPage({ params }: EditorPageProps) {
+  return (
+    <Suspense fallback={<LoadingSkeleton />}>
+      <EditorContent params={params} />
+    </Suspense>
+  );
 }

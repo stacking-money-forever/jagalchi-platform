@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { accessTokenAtom } from '@/lib/auth-atoms';
+import { sessionPresentAtom } from '@/lib/auth-atoms';
 import { createTestWrapper } from '@/test-utils';
 
 const roadmapId = '11111111-1111-4111-8111-111111111111';
@@ -32,7 +32,7 @@ describe('useRoadmapProgress', () => {
 
   it('fetches progress for a UUID roadmap', async () => {
     const { result } = renderHook(() => useRoadmapProgress(roadmapId), {
-      wrapper: createTestWrapper([[accessTokenAtom, 'access-token']] as const),
+      wrapper: createTestWrapper([[sessionPresentAtom, true]] as const),
     });
 
     await waitFor(() => expect(result.current.data).toBeDefined());

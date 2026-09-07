@@ -1,0 +1,7 @@
+appId: com.jagalchi.app
+---
+- launchApp:
+    clearState: true
+- assertVisible: "자갈치"
+- tapOn: "로그인"
+- assertVisible: "프로젝트 실행 ID"

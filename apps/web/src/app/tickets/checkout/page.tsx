@@ -1,5 +1,7 @@
+import { Suspense } from 'react';
+
 import Link from 'next/link';
-import { notFound, redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 
 import { ArrowLeft, Ticket } from 'lucide-react';
 
@@ -14,15 +16,11 @@ export const metadata: Metadata = {
   description: '선택한 AI 티켓 팩과 결제 조건을 확인하세요.',
 };
 
-export default async function TicketCheckoutPage({
+async function TicketCheckoutContent({
   searchParams,
 }: {
   searchParams: Promise<{ pack?: string | string[] }>;
 }) {
-  if (process.env.NEXT_PUBLIC_AI_FEATURES_ENABLED !== 'true') {
-    redirect('/career');
-  }
-
   const rawPack = (await searchParams).pack;
   const packId = Array.isArray(rawPack) ? rawPack[0] : rawPack;
   const pack = TICKET_PACKS.find((candidate) => candidate.id === packId);
@@ -68,5 +66,17 @@ export default async function TicketCheckoutPage({
         </section>
       </div>
     </AppShell>
+  );
+}
+
+export default function TicketCheckoutPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ pack?: string | string[] }>;
+}) {
+  return (
+    <Suspense fallback={<p className="p-8 text-center">결제 정보를 준비하고 있어요…</p>}>
+      <TicketCheckoutContent searchParams={searchParams} />
+    </Suspense>
   );
 }

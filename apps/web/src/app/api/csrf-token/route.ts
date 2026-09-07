@@ -5,7 +5,8 @@ import { randomBytes } from 'crypto';
 
 const CSRF_COOKIE_NAME = 'csrf-token';
 const TOKEN_MAX_AGE_SECONDS = 7_200; // 2시간
-const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const USE_SECURE_COOKIE =
+  process.env.NEXT_PUBLIC_ENV === 'development' ? false : process.env.NODE_ENV === 'production';
 
 /**
  * CSRF 토큰 발급 엔드포인트.
@@ -25,7 +26,7 @@ export function GET(request: NextRequest) {
   // httpOnly: true — 클라이언트는 JSON 바디로 토큰을 읽으므로 document.cookie 불필요.
   response.cookies.set(CSRF_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: IS_PRODUCTION,
+    secure: USE_SECURE_COOKIE,
     sameSite: 'lax',
     path: '/',
     maxAge: TOKEN_MAX_AGE_SECONDS,

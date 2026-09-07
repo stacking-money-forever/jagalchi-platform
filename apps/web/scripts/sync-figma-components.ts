@@ -40,7 +40,6 @@ const EXPECTED_STORIES = [
   'ContextMenu-Default',
   'ToolbarButton-Default',
   'EditorButton-Default',
-  'RoadmapAiModal-Default',
 ];
 
 /**
@@ -64,7 +63,6 @@ const FIGMA_NAME_PATTERNS: Record<string, string[]> = {
   'ContextMenu-Default': ['Context Menu', 'ContextMenu'],
   'ToolbarButton-Default': ['Toolbar Button', 'ToolbarButton'],
   'EditorButton-Default': ['Editor Button', 'EditorButton'],
-  'RoadmapAiModal-Default': ['AI Modal', 'RoadmapAiModal', 'Roadmap AI Modal'],
 };
 
 /**

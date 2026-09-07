@@ -38,4 +38,14 @@ describe('sanitizeUrl', () => {
   it('trims whitespace from URL before processing', () => {
     expect(sanitizeUrl('  https://example.com  ')).toBe('https://example.com/');
   });
+
+  it('preserves a durable same-origin upload content path', () => {
+    expect(sanitizeUrl('/api/uploads/11111111-1111-4111-8111-111111111111/content')).toBe(
+      '/api/uploads/11111111-1111-4111-8111-111111111111/content',
+    );
+  });
+
+  it('rejects arbitrary same-origin paths', () => {
+    expect(sanitizeUrl('/api/admin')).toBe('#');
+  });
 });

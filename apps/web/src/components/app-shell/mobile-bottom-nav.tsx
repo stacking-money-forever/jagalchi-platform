@@ -1,10 +1,11 @@
 import Link from 'next/link';
 
-import { Bell, House, Route, Search, Target, UserRound, type LucideIcon } from 'lucide-react';
+import { BookOpen, CirclePlus, House, UserRound, type LucideIcon } from 'lucide-react';
 
 import { isEnabled } from '@/lib/feature-flags';
 
-export type AppTab = 'home' | 'career' | 'roadmaps' | 'explore' | 'create' | 'activity' | 'my';
+export type AppTab =
+  'home' | 'career' | 'roadmaps' | 'library' | 'explore' | 'create' | 'activity' | 'my';
 
 export interface MobileBottomNavProps {
   activeTab: AppTab;
@@ -16,14 +17,12 @@ const navItems: ReadonlyArray<{
   href: string;
   icon: LucideIcon;
 }> = [
-  { id: 'home', label: '홈', href: '/', icon: House },
-  ...(isEnabled('EVIDENCE_EXECUTION_ENABLED')
-    ? [{ id: 'career' as const, label: '커리어', href: '/career', icon: Target }]
+  { id: 'home', label: '내 프로젝트', href: '/myroadmap', icon: House },
+  { id: 'library', label: '라이브러리', href: '/library', icon: BookOpen },
+  ...(isEnabled('EVIDENCE_EXECUTION_ENABLED') && isEnabled('PROJECT_RUNS_ENABLED')
+    ? [{ id: 'create' as const, label: '만들기', href: '/projects/new', icon: CirclePlus }]
     : []),
-  { id: 'explore', label: '탐색', href: '/explore', icon: Search },
-  { id: 'roadmaps', label: '실행', href: '/myroadmap', icon: Route },
-  { id: 'activity', label: '활동', href: '/activity', icon: Bell },
-  { id: 'my', label: '마이', href: '/profile', icon: UserRound },
+  { id: 'my', label: '계정', href: '/profile', icon: UserRound },
 ];
 
 export function MobileBottomNav({ activeTab }: MobileBottomNavProps) {
@@ -43,7 +42,7 @@ export function MobileBottomNav({ activeTab }: MobileBottomNavProps) {
                 aria-current={isActive ? 'page' : undefined}
                 aria-label={item.label}
                 className={[
-                  'min-h-touch flex w-full flex-col items-center justify-center gap-0.5 rounded-md px-1 py-1 text-[10px] font-semibold transition-[background-color,color,transform] active:scale-95',
+                  'min-h-touch flex w-full flex-col items-center justify-center gap-0.5 rounded-md px-1 py-1 text-[10px] font-semibold transition-[background-color,color]',
                   'focus-visible:ring-ring focus-visible:ring-offset-surface focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
                   isActive
                     ? 'bg-primary text-primary-foreground'

@@ -42,6 +42,7 @@ describe('auth API', () => {
   });
 
   it('signUp calls POST /users', () => {
+    vi.mocked(apiClient.post).mockResolvedValue({ authenticated: true });
     signUp({
       email: 'a@b.com',
       name: 'test',
@@ -100,10 +101,10 @@ describe('auth API', () => {
   it('refreshToken uses the shared refresh coordinator', async () => {
     vi.mocked(refreshAccessTokenClient).mockResolvedValue({
       status: 'refreshed',
-      accessToken: 'refreshed-token',
+      session: { authenticated: true },
     });
 
-    await expect(refreshToken()).resolves.toEqual({ accessToken: 'refreshed-token' });
+    await expect(refreshToken()).resolves.toEqual({ authenticated: true });
     expect(refreshAccessTokenClient).toHaveBeenCalledTimes(1);
   });
 

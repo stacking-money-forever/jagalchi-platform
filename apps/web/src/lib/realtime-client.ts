@@ -1,7 +1,6 @@
 import { io, type Socket } from 'socket.io-client';
 
-import { getAccessToken } from '@/api/client';
-import { getRoadmapDomainEvents } from '@/api/roadmap-domain';
+import { getRoadmapDomainEvents, issueRealtimeTicket } from '@/api/roadmap-domain';
 
 export type RealtimeEvent = 'roadmap:event' | 'roadmap:cursor' | 'roadmap:cursor-hide';
 
@@ -37,12 +36,16 @@ function realtimeOrigin(): string {
   return new URL(configured, window.location.origin).origin;
 }
 
-function getSocket(): Socket {
-  if (socket) return socket;
+function getSocket(ticket: string): Socket {
+  if (socket) {
+    socket.auth = { ticket };
+    return socket;
+  }
   socket = io(`${realtimeOrigin()}/roadmaps`, {
     autoConnect: false,
     transports: ['websocket'],
-    auth: (callback) => callback({ token: getAccessToken() }),
+    auth: { ticket },
+    reconnection: false,
     reconnectionDelay: 1_000,
     reconnectionDelayMax: 5_000,
     timeout: 10_000,
@@ -50,8 +53,17 @@ function getSocket(): Socket {
   return socket;
 }
 
-export function connectRealtime(options: RealtimeConnectOptions): void {
-  const current = getSocket();
+export async function connectRealtime(options: RealtimeConnectOptions): Promise<void> {
+  let ticket: string;
+  try {
+    ({ ticket } = await issueRealtimeTicket());
+  } catch (error) {
+    options.onError?.(
+      error instanceof Error ? error : new Error('실시간 연결 티켓을 발급하지 못했습니다.'),
+    );
+    return;
+  }
+  const current = getSocket(ticket);
   consumers += 1;
   const onConnect = () => {
     current.emit('roadmap:join', { roadmapId: options.roadmapId }, (result: EditResponse) => {

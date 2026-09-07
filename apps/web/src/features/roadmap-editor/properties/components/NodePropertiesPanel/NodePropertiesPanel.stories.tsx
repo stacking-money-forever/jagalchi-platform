@@ -8,6 +8,9 @@ import type { JagalchiNodeType } from '../../../types/editor.types';
 const meta = {
   title: 'Features/RoadmapEditor/Organisms/NodePropertiesPanel',
   component: NodePropertiesPanel,
+  args: {
+    roadmapId: '11111111-1111-4111-8111-111111111111',
+  },
   parameters: {
     layout: 'fullscreen',
   },

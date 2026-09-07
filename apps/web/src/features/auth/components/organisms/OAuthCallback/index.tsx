@@ -43,7 +43,7 @@ export function OAuthCallback({ code }: { code: string | null }) {
     void exchangeOnce(code)
       .then((result) => {
         if (!active) return;
-        setLogin(result.accessToken);
+        setLogin(result);
         router.replace('/');
       })
       .catch((reason: unknown) => {

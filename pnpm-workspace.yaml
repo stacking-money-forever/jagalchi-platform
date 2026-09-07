@@ -1,5 +1,7 @@
 packages:
   - apps/*
-  - services/api
+  - packages/*
 
 injectWorkspacePackages: true
+syncInjectedDepsAfterScripts:
+  - build

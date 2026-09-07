@@ -23,6 +23,7 @@ describe('proxy', () => {
       '/profile/abc',
       '/editor',
       '/editor/new',
+      '/projects/00000000-0000-4000-8000-000000000001',
     ];
 
     it.each(protectedPaths)('세션 없이 %s 접근 시 /login 으로 리다이렉트한다', (pathname) => {

@@ -12,9 +12,7 @@ import { isEnabled } from '@/lib/feature-flags';
 
 import type { Metadata } from 'next';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-export const fetchCache = 'force-no-store';
+export const instant = false;
 
 interface ProofProfilePageProps {
   params: Promise<{ publicId: string }>;

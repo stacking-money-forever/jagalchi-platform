@@ -55,7 +55,7 @@ export const PlusButtonHandle = forwardRef<HTMLButtonElement, PlusButtonHandlePr
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
           className={cn(
-            'border-primary bg-background hover:bg-primary-subtle absolute z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all hover:scale-110',
+            'border-primary bg-background hover:bg-primary-subtle absolute z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 transition-[color,background-color,border-color,transform] hover:scale-110',
             POSITION_STYLES[position],
             className,
           )}

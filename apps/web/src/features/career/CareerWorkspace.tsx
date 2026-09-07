@@ -101,7 +101,7 @@ export type ProofPublicationCapability =
 export function getProofPublicationCapability(
   eligible: boolean,
   publication: OwnerProofProfile['proofs'][number] | undefined,
-  now = Date.now(),
+  now: number,
 ): ProofPublicationCapability {
   if (!eligible) return null;
   if (!publication) return 'FIRST_PUBLISH';
@@ -186,7 +186,7 @@ function verificationErrorMessage(error: unknown): string {
 }
 
 function CareerWorkspaceContent({ proofProfileEnabled }: { proofProfileEnabled: boolean }) {
-  const [renderedAt] = useState(Date.now);
+  const [renderedAt, setRenderedAt] = useState<number | null>(null);
   const [githubCallbackStatus, setGithubCallbackStatus] = useState<
     { state: 'pending' | 'success' | 'error'; message: string } | undefined
   >();
@@ -220,6 +220,11 @@ function CareerWorkspaceContent({ proofProfileEnabled }: { proofProfileEnabled: 
   );
   const startGithubClaim = useStartGithubInstallationClaim();
   const completeGithubClaim = useCompleteGithubInstallationClaim();
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setRenderedAt(Date.now()), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (githubCallbackHandled.current) return;
@@ -484,8 +489,10 @@ function CareerWorkspaceContent({ proofProfileEnabled }: { proofProfileEnabled: 
                   </div>
                   <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/20">
                     <div
-                      className="h-full rounded-full bg-white transition-[width]"
-                      style={{ width: `${diffQuery.data.summary.verifiedPercentage}%` }}
+                      className="h-full w-full origin-left rounded-full bg-white transition-transform"
+                      style={{
+                        transform: `scaleX(${diffQuery.data.summary.verifiedPercentage / 100})`,
+                      }}
                     />
                   </div>
                 </article>
@@ -1035,7 +1042,7 @@ function ProofPublicationControls({
   renderedAt,
 }: {
   mission: ProofMission;
-  renderedAt: number;
+  renderedAt: number | null;
 }) {
   const ownerProofProfileQuery = useOwnerProofProfile();
   const publishOwnerProof = usePublishOwnerProof();
@@ -1050,7 +1057,8 @@ function ProofPublicationControls({
     mission.currentReview?.decision === 'APPROVED' &&
     mission.currentReview.verificationRunId === mission.currentVerificationRun.id,
   );
-  const capability = getProofPublicationCapability(eligible, publication, renderedAt);
+  const capability =
+    renderedAt === null ? null : getProofPublicationCapability(eligible, publication, renderedAt);
 
   if (capability === 'FIRST_PUBLISH' || capability === 'REPUBLISH') {
     return (

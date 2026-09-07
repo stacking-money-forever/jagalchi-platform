@@ -11,7 +11,7 @@ let pathname = '/';
 vi.mock('@/lib/analytics/client', () => analytics);
 vi.mock('next/navigation', () => ({ usePathname: () => pathname }));
 
-import { accessTokenAtom, currentUserIdAtom, isAuthInitializedAtom } from '@/lib/auth-atoms';
+import { sessionPresentAtom, currentUserIdAtom, isAuthInitializedAtom } from '@/lib/auth-atoms';
 
 import { AnalyticsProvider } from './AnalyticsProvider';
 
@@ -19,7 +19,7 @@ function renderProvider(initialized: boolean, userId: string | null, path = '/')
   pathname = path;
   const store = createStore();
   store.set(isAuthInitializedAtom, initialized);
-  store.set(accessTokenAtom, userId === null ? null : 'access-token');
+  store.set(sessionPresentAtom, userId !== null);
   store.set(currentUserIdAtom, userId);
   const view = render(
     <Provider store={store}>
@@ -93,7 +93,7 @@ describe('AnalyticsProvider', () => {
     await waitFor(() => expect(analytics.capture).toHaveBeenCalledTimes(1));
 
     await act(async () => {
-      store.set(accessTokenAtom, 'new-token');
+      store.set(sessionPresentAtom, true);
       store.set(currentUserIdAtom, 'opaque-user-id');
     });
     await waitFor(() =>

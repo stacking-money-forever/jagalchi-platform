@@ -86,7 +86,7 @@ export const ColorSelector = memo(function ColorSelector({
           <button
             type="button"
             onClick={handleCustomColorClick}
-            className="border-border focus-visible:ring-ring/40 h-8 min-h-[32px] w-full flex-1 rounded-[8px] border shadow-sm transition-all hover:scale-105 hover:shadow-md focus-visible:ring-3 focus-visible:outline-none active:scale-95"
+            className="border-border focus-visible:ring-ring/40 h-8 min-h-[32px] w-full flex-1 rounded-[8px] border shadow-sm transition-[color,background-color,border-color,box-shadow,transform] hover:scale-105 hover:shadow-md focus-visible:ring-3 focus-visible:outline-none active:scale-95"
             style={{ backgroundColor: currentColorHex }}
             aria-label={`현재 색상: ${currentColorHex}`}
           />

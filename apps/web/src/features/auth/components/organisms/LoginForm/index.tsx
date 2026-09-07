@@ -53,7 +53,7 @@ export function LoginForm() {
     loginMutation.mutate(data, {
       onSuccess: (response) => {
         capture('login_completed', { method: 'email' });
-        setLogin(response.accessToken);
+        setLogin(response);
         router.push('/');
       },
       onError: (error) => {
@@ -65,9 +65,9 @@ export function LoginForm() {
   const handleOAuth = async (provider: 'google' | 'github' | 'apple', authorizationUrl: string) => {
     setActiveOAuthProvider(provider);
     try {
-      const accessToken = await beginOAuth(authorizationUrl);
-      if (accessToken) {
-        setLogin(accessToken);
+      const session = await beginOAuth(authorizationUrl);
+      if (session) {
+        setLogin(session);
         router.replace('/');
       }
     } catch (error) {

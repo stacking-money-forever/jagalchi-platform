@@ -29,7 +29,7 @@ vi.mock('@xyflow/react', () => ({
 }));
 
 import { VIEWER_MESSAGES } from '@/constants/messages';
-import { accessTokenAtom } from '@/lib/auth-atoms';
+import { sessionPresentAtom } from '@/lib/auth-atoms';
 import type { RoadmapNode } from '@/types/roadmap.types';
 import { viewerRoadmapAtom } from '../../stores/viewer-atoms';
 import { ViewerSidebar } from './index';
@@ -146,7 +146,7 @@ describe('ViewerSidebar', () => {
       <TestWrapper
         initialValues={[
           [viewerRoadmapAtom, mockRoadmap],
-          [accessTokenAtom, 'access-token'],
+          [sessionPresentAtom, true],
         ]}
       >
         <ViewerSidebar isOpen={true} roadmapId="1" />

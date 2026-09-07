@@ -1,0 +1,31 @@
+{
+  "gate": "redesign-preset",
+  "selectedPreset": "Action-first Journey Workspace",
+  "approvedByUser": true,
+  "exemplarApprovedByUser": true,
+  "scope": [
+    "one owner projects/[runId] route",
+    "action-first current task document",
+    "React Flow journey plus semantic list",
+    "task selection/action safety",
+    "global semantic dark token values for layered charcoal dark mode",
+    "correct journey presentation for empty/ungrouped states"
+  ],
+  "deferred": [
+    "public proof/profile/lease resource mapping",
+    "API additions and provider changes"
+  ],
+  "rolloutApprovedByUser": [
+    "Home and legacy relocation",
+    "Create rewrite",
+    "global navigation",
+    "owner Proof readability and account-scope separation"
+  ],
+  "finalReview": {
+    "userVisualApproval": true,
+    "appleDesign": "APPROVE: purpose, wayfinding, agency, responsive text and reduced-motion rules are satisfied without decorative Apple imitation.",
+    "animationReview": "APPROVE: high-frequency navigation scale motion removed; changed journey controls use instant fitView and color-only feedback.",
+    "automatedVerification": "PASS: lint, typecheck, 181 test files / 1038 tests, consumer contracts, diff check, production build."
+  },
+  "approvalSource": "current Codex conversation"
+}
