@@ -82,10 +82,7 @@ type WizardStep =
   | 'plan-confirm'
   | 'run-create';
 
-const SUPPORTED_SOURCES = [
-  '공개 채용 URL (fixture.invalid 포함 로컬 E2E)',
-  '수동 캡처 (URL 없이 본문 붙여넣기 또는 자동 수집 실패 시)',
-];
+const SUPPORTED_SOURCES = ['공개 채용 URL', '공고 본문 붙여넣기 (URL이 없거나 가져오지 못했을 때)'];
 
 const DEFAULT_CONSTRAINTS = {
   availableHours: 40,
@@ -126,7 +123,7 @@ export function TargetEntryWizard() {
     message: string;
     code?: string;
   } | null>(null);
-  const [cancelled, setCancelled] = useState(false);
+  const [cancellation, setCancellation] = useState<'requested' | 'completed' | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
 
   const [careerTargetId, setCareerTargetId] = useState<string | null>(null);
@@ -179,7 +176,7 @@ export function TargetEntryWizard() {
 
   const resetFailure = () => {
     setFailure(null);
-    setCancelled(false);
+    setCancellation(null);
   };
 
   const handleGateError = useCallback((error: unknown) => {
@@ -191,8 +188,7 @@ export function TargetEntryWizard() {
     if (error instanceof ApiResponseError) {
       setFailure({
         title: '요청이 거절됐습니다',
-        message: error.message,
-        code: error.code,
+        message: '입력과 확인한 내용을 유지했습니다. 다시 시도해 주세요.',
         retryable: error.status >= 500,
       });
       return true;
@@ -214,7 +210,7 @@ export function TargetEntryWizard() {
         const finished = await pollUntilTerminal(started.id, setActiveOperation);
         setActiveOperation(finished);
         if (finished.state === 'CANCELLED') {
-          setCancelled(true);
+          setCancellation('completed');
           return;
         }
         if (finished.state === 'FAILED') {
@@ -229,13 +225,13 @@ export function TargetEntryWizard() {
         await onSuccess(finished);
       } catch (error) {
         if ((error as Error).message === 'WORKFLOW_POLL_ABORTED') {
-          setCancelled(true);
+          setCancellation('requested');
           return;
         }
         if (!handleGateError(error)) {
           setFailure({
             title: '요청 처리 중 오류',
-            message: error instanceof Error ? error.message : '알 수 없는 오류',
+            message: '입력과 확인한 내용을 유지했습니다. 다시 시도해 주세요.',
             retryable: true,
           });
         }
@@ -247,7 +243,7 @@ export function TargetEntryWizard() {
   const cancelActiveOperation = useCallback(async () => {
     if (!activeOperation) {
       stop();
-      setCancelled(true);
+      setCancellation('requested');
       return;
     }
     try {
@@ -256,7 +252,7 @@ export function TargetEntryWizard() {
         ifMatch: String(activeOperation.version),
       });
       setActiveOperation(cancelledOperation);
-      setCancelled(true);
+      setCancellation(cancelledOperation.state === 'CANCELLED' ? 'completed' : 'requested');
       stop();
     } catch (error) {
       handleGateError(error);
@@ -367,8 +363,8 @@ export function TargetEntryWizard() {
     } catch (error) {
       if (!handleGateError(error)) {
         setFailure({
-          title: '프로필 확인 실패',
-          message: error instanceof Error ? error.message : '알 수 없는 오류',
+          title: '확인 내용을 저장하지 못했습니다',
+          message: '선택한 내용은 그대로 남아 있습니다. 다시 시도해 주세요.',
           retryable: true,
         });
       }
@@ -420,8 +416,8 @@ export function TargetEntryWizard() {
     } catch (error) {
       if (!handleGateError(error)) {
         setFailure({
-          title: 'Career Diff 확인 실패',
-          message: error instanceof Error ? error.message : '알 수 없는 오류',
+          title: '확인 내용을 저장하지 못했습니다',
+          message: '선택한 내용은 그대로 남아 있습니다. 다시 시도해 주세요.',
           retryable: true,
         });
       }
@@ -522,6 +518,14 @@ export function TargetEntryWizard() {
       void beginProfileImport();
       return;
     }
+    if (step === 'profile-review') {
+      void confirmProfileReview();
+      return;
+    }
+    if (step === 'diff-review') {
+      void confirmDiffReview();
+      return;
+    }
     if (step === 'proposals-generate') {
       void confirmDiffReview();
       return;
@@ -529,7 +533,14 @@ export function TargetEntryWizard() {
     if (step === 'run-create') {
       void createProjectRun();
     }
-  }, [beginIntake, beginProfileImport, confirmDiffReview, createProjectRun, step]);
+  }, [
+    beginIntake,
+    beginProfileImport,
+    confirmDiffReview,
+    confirmProfileReview,
+    createProjectRun,
+    step,
+  ]);
 
   const operationBusy =
     step === 'target-import' ||
@@ -540,15 +551,15 @@ export function TargetEntryWizard() {
   const operationTitle: Record<WizardStep, string> = {
     intake: '준비 중',
     'target-import': '공고 가져오는 중',
-    'profile-import': 'GitHub 증거 수집 중',
-    'profile-review': '프로필 검토',
-    'diff-create': 'Career Diff 생성 중',
-    'diff-review': 'Career Diff 검토',
-    'proposals-generate': '프로젝트 제안 생성 중',
-    'proposals-review': '제안 비교',
+    'profile-import': '작업 정보를 가져오는 중',
+    'profile-review': '가져온 작업 정보 확인',
+    'diff-create': '준비 상태를 확인하는 중',
+    'diff-review': '준비 상태 확인',
+    'proposals-generate': '프로젝트를 준비하는 중',
+    'proposals-review': '프로젝트 비교 및 선택',
     'repository-bind': '저장소 연결',
-    'plan-confirm': '범위 확인',
-    'run-create': '프로젝트 실행 생성 중',
+    'plan-confirm': '시작 내용 확인',
+    'run-create': '프로젝트를 시작하는 중',
   };
 
   if (!projectRunsEnabled || !evidenceEnabled) {
@@ -567,9 +578,6 @@ export function TargetEntryWizard() {
       <div className="border-border rounded-2xl border p-6">
         <h1 className="text-xl font-bold">{gateBlocked.title}</h1>
         <p className="text-muted-foreground mt-2 text-sm">{gateBlocked.message}</p>
-        {gateBlocked.code ? (
-          <p className="text-muted-foreground mt-1 text-xs">코드: {gateBlocked.code}</p>
-        ) : null}
         <Button asChild className="mt-4" variant="outline">
           <Link href="/create">돌아가기</Link>
         </Button>
@@ -579,30 +587,51 @@ export function TargetEntryWizard() {
 
   return (
     <div className="space-y-6">
-      <header className="space-y-2">
-        <p className="text-muted-foreground text-sm">Phase 2 · Target Entry</p>
-        <h1 className="text-2xl font-bold">목표 공고 → 프로젝트 실행</h1>
+      <header className="space-y-3">
+        <h1 className="text-2xl font-bold">새 프로젝트 시작</h1>
         <p className="text-muted-foreground text-sm">
-          공고 수집, GitHub 증거 확인, Career Diff, 제안 비교 후 프로젝트 실행(Map)까지 이어집니다.
+          목표를 확인하고, 맞는 프로젝트와 시작 방법을 직접 선택하세요.
         </p>
+        <ol className="grid gap-2 text-sm sm:grid-cols-3" aria-label="프로젝트 시작 단계">
+          {[
+            ['목표와 기존 작업', ['intake', 'target-import', 'profile-import', 'profile-review']],
+            [
+              '프로젝트 비교/선택',
+              ['diff-create', 'diff-review', 'proposals-generate', 'proposals-review'],
+            ],
+            ['저장소 연결/시작', ['repository-bind', 'plan-confirm', 'run-create']],
+          ].map(([label, steps], index) => (
+            <li
+              key={label as string}
+              aria-current={(steps as string[]).includes(step) ? 'step' : undefined}
+              className="border-border rounded-lg border px-3 py-2 font-medium"
+            >
+              {index + 1}. {label as string}
+            </li>
+          ))}
+        </ol>
       </header>
 
       {operationBusy ? (
         <OperationStatusPanel
           title={operationTitle[step]}
-          message="WorkflowOperation을 폴링합니다. Retry-After를 준수합니다."
-          busy={!failure && !cancelled}
+          message="준비가 끝나면 다음 선택으로 이어집니다."
+          busy={!failure && !cancellation}
           failure={failure}
-          cancelled={cancelled}
+          cancellation={cancellation}
           onRetry={retryCurrentOperation}
           onCancel={() => void cancelActiveOperation()}
         />
       ) : null}
 
+      {failure && !operationBusy ? (
+        <OperationStatusPanel failure={failure} onRetry={retryCurrentOperation} />
+      ) : null}
+
       {step === 'intake' ? (
         <section className="space-y-4">
           <div className="border-border rounded-xl border p-4">
-            <h2 className="font-semibold">지원 소스</h2>
+            <h2 className="font-semibold">목표를 가져오는 방법</h2>
             <ul className="text-muted-foreground mt-2 list-disc space-y-1 pl-4 text-sm">
               {SUPPORTED_SOURCES.map((item) => (
                 <li key={item}>{item}</li>
@@ -610,7 +639,7 @@ export function TargetEntryWizard() {
             </ul>
           </div>
           <label className="block space-y-2">
-            <span className="text-sm font-semibold">채용 공고 URL</span>
+            <span className="text-sm font-semibold">공고 URL</span>
             <Input value={jobUrl} onChange={(event) => setJobUrl(event.target.value)} />
           </label>
           {showManualCapture ? (
@@ -651,7 +680,7 @@ export function TargetEntryWizard() {
 
       {step === 'diff-create' || (step === 'diff-review' && confirmBusy) ? (
         <OperationStatusPanel
-          title={confirmBusy ? 'Career Diff 확인 중' : 'Career Diff 생성 중'}
+          title={confirmBusy ? '확인 내용을 저장하는 중' : '준비 상태를 확인하는 중'}
           busy
         />
       ) : null}
@@ -667,9 +696,9 @@ export function TargetEntryWizard() {
 
       {step === 'proposals-review' && proposalViews.length > 0 ? (
         <section className="space-y-4">
-          <h2 className="text-lg font-bold">프로젝트 제안 비교</h2>
+          <h2 className="text-lg font-bold">프로젝트 비교 및 선택</h2>
           <p className="text-muted-foreground text-sm">
-            세 가지 제안을 동일한 기준으로 비교한 뒤 하나를 선택하세요.
+            각 프로젝트의 결과와 하지 않는 일을 비교한 뒤 하나를 선택하세요.
           </p>
           <ProposalComparisonGrid
             proposals={proposalViews}
@@ -686,7 +715,7 @@ export function TargetEntryWizard() {
         <div className="border-border rounded-xl border p-4">
           <p className="font-semibold">제안을 표시할 수 없습니다</p>
           <p className="text-muted-foreground mt-1 text-sm">
-            서버가 정확히 3개의 제안을 반환해야 합니다. 다시 시도해 주세요.
+            아직 비교할 프로젝트를 준비하지 못했습니다. 입력과 확인한 내용은 그대로 남아 있습니다.
           </p>
           <Button className="mt-3" variant="outline" onClick={() => void confirmDiffReview()}>
             제안 다시 생성
@@ -711,10 +740,10 @@ export function TargetEntryWizard() {
 
       {step === 'plan-confirm' && selectedProposal ? (
         <section className="space-y-4">
-          <h2 className="text-lg font-bold">범위 및 비목표 확인</h2>
+          <h2 className="text-lg font-bold">시작 내용 확인</h2>
           <div className="border-border space-y-3 rounded-xl border p-4 text-sm">
             <div>
-              <h3 className="font-semibold">인용 요구사항</h3>
+              <h3 className="font-semibold">이번 프로젝트에서 다룰 내용</h3>
               <ul className="text-muted-foreground mt-1 list-disc pl-4">
                 {selectedProposal.citedRequirements.map((item) => (
                   <li key={item.id}>{item.label}</li>
@@ -722,7 +751,7 @@ export function TargetEntryWizard() {
               </ul>
             </div>
             <div>
-              <h3 className="font-semibold">인용 갭</h3>
+              <h3 className="font-semibold">보완할 부분</h3>
               <ul className="text-muted-foreground mt-1 list-disc pl-4">
                 {selectedProposal.citedGaps.map((item) => (
                   <li key={item.id}>{item.description}</li>
@@ -730,7 +759,7 @@ export function TargetEntryWizard() {
               </ul>
             </div>
             <div>
-              <h3 className="font-semibold">한정 성과</h3>
+              <h3 className="font-semibold">기대하는 결과</h3>
               <p className="text-muted-foreground mt-1">{selectedProposal.boundedOutcome}</p>
             </div>
             <div>
@@ -744,15 +773,15 @@ export function TargetEntryWizard() {
               </ul>
             </div>
             <p className="text-muted-foreground text-xs">
-              대상 공고: {targetHeader.company} · {targetHeader.role}
+              대상: {targetHeader.company} · {targetHeader.role}
             </p>
           </div>
-          <Button onClick={() => void createProjectRun()}>프로젝트 실행 만들기</Button>
+          <Button onClick={() => void createProjectRun()}>프로젝트 시작</Button>
         </section>
       ) : null}
 
       {confirmBusy && step === 'profile-review' ? (
-        <OperationStatusPanel title="증거 스냅샷 확인 중" busy />
+        <OperationStatusPanel title="확인 내용을 저장하는 중" busy />
       ) : null}
     </div>
   );

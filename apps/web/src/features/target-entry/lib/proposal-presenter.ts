@@ -30,7 +30,7 @@ const DIFFICULTY_LABEL: Record<string, string> = {
 const REPOSITORY_MODE_LABEL: Record<RepositoryMode, string> = {
   EXISTING_OWNED: '기존 저장소',
   OPEN_SOURCE_CONTRIBUTION: '오픈소스 기여',
-  MANUAL_GREENFIELD: '신규 프로젝트',
+  MANUAL_GREENFIELD: '새 작업으로 시작',
 };
 
 export function repositoryModeLabel(mode: RepositoryMode): string {
@@ -42,20 +42,12 @@ export function difficultyLabel(value?: string): string {
   return DIFFICULTY_LABEL[value] ?? value;
 }
 
-export function assertThreeProposals(proposals: ProjectProposalRecord[]): ProjectProposalRecord[] {
-  const sorted = [...proposals].sort((a, b) => a.rank - b.rank);
-  if (sorted.length !== 3) {
-    throw new Error(`EXPECTED_THREE_PROPOSALS:${sorted.length}`);
-  }
-  return sorted;
-}
-
 export function buildProposalComparisons(
   proposals: ProjectProposalRecord[],
   citations: CitationView[],
   gaps: DiffGapView[],
 ): ProposalComparisonView[] {
-  const ordered = assertThreeProposals(proposals);
+  const ordered = [...proposals].sort((a, b) => a.rank - b.rank);
   const citationById = new Map(citations.map((item) => [item.id, item]));
   const gapById = new Map(gaps.map((item) => [item.id, item]));
 

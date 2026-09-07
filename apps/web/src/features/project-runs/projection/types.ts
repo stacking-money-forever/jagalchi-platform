@@ -11,7 +11,8 @@ export type RoadmapTask = {
   title: string;
   state: TaskState;
   required: boolean;
-  milestoneId: string;
+  /** A task may legitimately be outside a named milestone. */
+  milestoneId: string | null;
   prerequisiteIds: string[];
   purpose: string;
   acceptanceCriteria: string[];

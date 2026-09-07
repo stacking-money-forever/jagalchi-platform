@@ -9,23 +9,29 @@ export function OperationStatusPanel({
   message,
   busy = false,
   failure,
-  cancelled = false,
+  cancellation,
   onRetry,
   onCancel,
 }: {
-  title: string;
+  title?: string;
   message?: string;
   busy?: boolean;
   failure?: OperationFailureView | null;
-  cancelled?: boolean;
+  cancellation?: 'requested' | 'completed' | null;
   onRetry?: () => void;
   onCancel?: () => void;
 }) {
-  if (cancelled) {
+  if (cancellation) {
     return (
       <section className="border-border bg-muted/30 rounded-2xl border p-6" role="status">
-        <h2 className="text-lg font-bold">작업이 취소됐습니다</h2>
-        <p className="text-muted-foreground mt-2 text-sm">다시 시도하거나 입력을 수정해 주세요.</p>
+        <h2 className="text-lg font-bold">
+          {cancellation === 'completed' ? '작업이 취소됐습니다' : '취소를 요청했습니다'}
+        </h2>
+        <p className="text-muted-foreground mt-2 text-sm">
+          {cancellation === 'completed'
+            ? '입력과 선택은 그대로 남아 있습니다. 필요하면 수정한 뒤 다시 시작하세요.'
+            : '취소 요청이 처리되기 전까지는 완료 여부를 확인할 수 없습니다. 입력과 선택은 그대로 남아 있습니다.'}
+        </p>
         {onRetry ? (
           <Button className="mt-4" onClick={onRetry}>
             다시 시도
@@ -43,9 +49,6 @@ export function OperationStatusPanel({
       >
         <h2 className="text-lg font-bold">{failure.title}</h2>
         <p className="text-muted-foreground mt-2 text-sm">{failure.message}</p>
-        {failure.code ? (
-          <p className="text-muted-foreground mt-1 text-xs">코드: {failure.code}</p>
-        ) : null}
         <div className="mt-4 flex flex-wrap gap-2">
           {failure.retryable && onRetry ? <Button onClick={onRetry}>다시 시도</Button> : null}
           {onCancel ? (

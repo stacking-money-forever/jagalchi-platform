@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { projectRunQueryKey } from '@jagalchi/api-client';
 import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query';
 
+import { AppShell } from '@/components/app-shell/app-shell';
 import { ProjectRunLive } from '@/features/project-runs/project-run-live';
 import {
   ProjectRunSkeleton,
@@ -33,10 +34,12 @@ async function ProjectRunFromParams({ params }: { params: Promise<{ runId: strin
 
 export default function ProjectRunPage({ params }: { params: Promise<{ runId: string }> }) {
   return (
-    <main className="mx-auto flex min-h-dvh max-w-[1600px] flex-col p-6">
-      <Suspense fallback={<ProjectRunSkeleton />}>
-        <ProjectRunFromParams params={params} />
-      </Suspense>
-    </main>
+    <AppShell activeTab="my">
+      <div>
+        <Suspense fallback={<ProjectRunSkeleton />}>
+          <ProjectRunFromParams params={params} />
+        </Suspense>
+      </div>
+    </AppShell>
   );
 }

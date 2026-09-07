@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ProjectProposalRecord } from '@jagalchi/api-client';
 
-import { assertThreeProposals, buildProposalComparisons } from './proposal-presenter';
+import { buildProposalComparisons } from './proposal-presenter';
 
 const proposals = (count: number): ProjectProposalRecord[] =>
   Array.from({ length: count }, (_, index) => ({
@@ -27,9 +27,9 @@ const proposals = (count: number): ProjectProposalRecord[] =>
   }));
 
 describe('proposal presenter', () => {
-  it('requires exactly three proposals', () => {
-    expect(() => assertThreeProposals(proposals(2))).toThrow('EXPECTED_THREE_PROPOSALS:2');
-    expect(assertThreeProposals(proposals(3)).map((item) => item.rank)).toEqual([1, 2, 3]);
+  it('compares every proposal the server returns in rank order', () => {
+    const views = buildProposalComparisons(proposals(2).reverse(), [], []);
+    expect(views.map((item) => item.rank)).toEqual([1, 2]);
   });
 
   it('builds comparison dimensions including tradeoffs from rejectionReasons', () => {

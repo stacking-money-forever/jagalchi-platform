@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { ProjectRunProjection } from '@jagalchi/api-client';
 
 import { adaptProjectRunProjection } from './adapt-projection';
+import { computeLayout, UNGROUPED_MILESTONE_ID } from './compute-layout';
 
 const baseRun = {
   id: 'run-1',
@@ -84,5 +85,39 @@ describe('adaptProjectRunProjection', () => {
     };
     const model = adaptProjectRunProjection(withTitles);
     expect(model.milestones).toEqual([{ id: 'm1', title: '인증 기반 구축' }]);
+  });
+
+  it('retains nullable-milestone tasks and keeps empty stages finite and not proof-ready', () => {
+    const model = adaptProjectRunProjection({
+      ...baseRun,
+      currentTaskId: 'ungrouped',
+      milestones: [{ id: 'empty', title: '빈 단계' }],
+      tasks: [{ ...baseRun.tasks[0], id: 'ungrouped', milestoneId: null, state: 'READY' }],
+    });
+    const layout = computeLayout(model, [], []);
+
+    expect(model.tasks).toHaveLength(1);
+    expect(model.tasks[0]?.milestoneId).toBeNull();
+    expect(layout.nodes.find((node) => node.id === 'ungrouped')?.parentId).toBe(
+      UNGROUPED_MILESTONE_ID,
+    );
+    expect(layout.nodes.find((node) => node.id === 'empty')?.position).toEqual(
+      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+    );
+    expect(layout.nodes.find((node) => node.id === 'proof')?.data.doneCount).toBe(0);
+  });
+
+  it('normalizes an unknown milestone id into the ungrouped map container', () => {
+    const model = adaptProjectRunProjection({
+      ...baseRun,
+      milestones: [{ id: 'known', title: '알려진 단계' }],
+      tasks: [{ ...baseRun.tasks[0], id: 'orphaned', milestoneId: 'missing-stage' }],
+    });
+    const layout = computeLayout(model, [], []);
+
+    expect(layout.nodes.find((node) => node.id === 'orphaned')?.parentId).toBe(
+      UNGROUPED_MILESTONE_ID,
+    );
+    expect(layout.nodes.find((node) => node.id === UNGROUPED_MILESTONE_ID)).toBeDefined();
   });
 });

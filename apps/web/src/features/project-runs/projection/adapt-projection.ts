@@ -65,8 +65,7 @@ function evidenceCountForTask(
 function adaptTask(
   task: ProjectRunProjection['tasks'][number],
   projection: ProjectRunProjection,
-): RoadmapTask | null {
-  if (!task.milestoneId) return null;
+): RoadmapTask {
   const blockedReason =
     task.verificationFailure?.note?.trim() || task.verificationFailure?.code || undefined;
 
@@ -103,9 +102,10 @@ function adaptProof(projection: ProjectRunProjection): RoadmapProofState | null 
  */
 export function adaptProjectRunProjection(projection: ProjectRunProjection): RoadmapGraphModel {
   const milestones = deriveMilestones(projection);
-  const tasks = projection.tasks
-    .map((task) => adaptTask(task, projection))
-    .filter((task): task is RoadmapTask => task !== null);
+  // A nullable milestone is valid projection data, not a reason to hide a
+  // task from its owner. The layout presents these in an explicit ungrouped
+  // lane.
+  const tasks = projection.tasks.map((task) => adaptTask(task, projection));
 
   return {
     runId: projection.id,

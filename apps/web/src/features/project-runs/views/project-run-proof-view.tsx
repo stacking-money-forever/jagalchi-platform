@@ -1,16 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
-import { nanoid } from 'nanoid';
-
-import { getOwnerProofProfile, updateOwnerProofProfile } from '@/api/proof-profile';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 
 import { useProjectRunCommands } from '../hooks/use-project-run-commands';
-import { projectRunTaskHref } from '../presentation-state';
 import {
   publicationLabelKo,
   resolveRepositoryDisplayName,
@@ -19,77 +14,72 @@ import {
 
 import type { ProjectRunProjection } from '@jagalchi/api-client';
 
-function formatSnapshotId(value: unknown): string | null {
-  if (typeof value === 'string' && value.length > 0) return value;
-  return null;
+const criterionLabels: Record<string, string> = {
+  MERGED_PR: 'PR 병합',
+  BASE_BRANCH: '기준 브랜치',
+  CHANGED_PATH: '변경 경로',
+  NAMED_CHECK: '지정된 검사',
+};
+
+function formatDateTime(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat('ko-KR', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: 'UTC',
+  }).format(date);
 }
 
-function taskIdsForRule(run: ProjectRunProjection, ruleId: string): string[] {
-  const index = Number(ruleId.match(/(\d+)$/)?.[1] ?? '-1');
-  if (!Number.isInteger(index) || index < 0) return [];
-  return run.tasks
-    .filter((task) => task.evidenceRequirements[index] !== undefined)
-    .map((task) => task.id);
+function resultLabel(state: 'PENDING' | 'PASS' | 'FAIL' | 'STALE'): string {
+  if (state === 'PASS') return '검증을 통과했습니다';
+  if (state === 'FAIL') return '검증 조건을 모두 통과하지 못했습니다';
+  if (state === 'STALE') return '검증 결과를 다시 확인해야 합니다';
+  return '검증 결과를 확인하는 중입니다';
 }
 
-function proofFactTaskIds(
-  run: ProjectRunProjection,
-  taskKey: string | null | undefined,
-  ruleIds: readonly string[],
-): string[] {
-  if (taskKey && run.tasks.some((task) => task.id === taskKey)) return [taskKey];
-  return [...new Set(ruleIds.flatMap((ruleId) => taskIdsForRule(run, ruleId)))];
-}
+function PublicationAction({ run }: { run: ProjectRunProjection }) {
+  const commands = useProjectRunCommands(run);
+  const proof = run.proof;
+  if (!proof || run.pendingOperation) return null;
 
-function TaskRequirementLinks({
-  run,
-  taskIds,
-  label = '로드맵 연결',
-}: {
-  run: ProjectRunProjection;
-  taskIds: readonly string[];
-  label?: string;
-}) {
-  const citationsById = useMemo(
-    () => new Map((run.citations ?? []).map((citation) => [citation.id, citation.label])),
-    [run.citations],
-  );
-  if (taskIds.length === 0) {
-    return <span className="text-muted-foreground">로드맵 작업 연결 없음</span>;
+  if (proof.publication.state === 'ACTIVE') {
+    return (
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={commands.unpublish.isPending}
+        onClick={() => commands.unpublish.mutate()}
+      >
+        이 실행의 발행 취소
+      </Button>
+    );
   }
-  return (
-    <div className="mt-2 space-y-1">
-      <p className="text-muted-foreground text-[11px] font-bold">{label}</p>
-      {taskIds.map((taskId) => {
-        const task = run.tasks.find((candidate) => candidate.id === taskId);
-        if (!task) return null;
-        return (
-          <div key={taskId} className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
-            <a
-              className="text-primary underline"
-              href={projectRunTaskHref(run.id, task.id)}
-              aria-label={`로드맵 작업으로 이동: ${task.title}`}
-            >
-              작업: {task.title}
-            </a>
-            {(task.citationIds ?? []).map((citationId) => {
-              const label = citationsById.get(citationId);
-              return label ? (
-                <a
-                  key={citationId}
-                  className="text-primary underline"
-                  href={projectRunTaskHref(run.id, task.id)}
-                  aria-label={`인용 요구사항으로 이동: ${label}`}
-                >
-                  요구사항: {label}
-                </a>
-              ) : null;
-            })}
-          </div>
-        );
-      })}
-    </div>
-  );
+  if (proof.verification.state === 'PASS' && proof.publication.state === 'UNPUBLISHED') {
+    return (
+      <Button
+        size="sm"
+        disabled={commands.publish.isPending}
+        onClick={() => commands.publish.mutate()}
+      >
+        이 실행 발행 요청
+      </Button>
+    );
+  }
+  if (proof.verification.state === 'FAIL' || proof.verification.state === 'STALE') {
+    return (
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={commands.reverify.isPending}
+        onClick={() => commands.reverify.mutate()}
+      >
+        재검증 요청
+      </Button>
+    );
+  }
+  return null;
 }
 
 export function ProjectRunProofView({ run }: { run: ProjectRunProjection }) {
@@ -98,18 +88,7 @@ export function ProjectRunProofView({ run }: { run: ProjectRunProjection }) {
   const binding = run.repositoryBinding;
   const facts = proof?.facts;
   const repositoryDisplayName = resolveRepositoryDisplayName(binding, facts);
-  const narrativeSource = proof?.summary ?? '';
-  const [narrativeDraft, setNarrativeDraft] = useState<{
-    source: string;
-    value: string;
-  } | null>(null);
-  const narrative =
-    narrativeDraft?.source === narrativeSource ? narrativeDraft.value : narrativeSource;
-  const [narrativeState, setNarrativeState] = useState<'idle' | 'saving' | 'saved' | 'error'>(
-    'idle',
-  );
-  const [narrativeError, setNarrativeError] = useState<string | null>(null);
-  const bindingSource = `${binding?.githubRepositoryId ?? ''}:${binding?.pullNumber ?? ''}`;
+  const bindingSource = (binding?.githubRepositoryId ?? '') + ':' + (binding?.pullNumber ?? '');
   const [bindingDraft, setBindingDraft] = useState<{
     source: string;
     repositoryId: string;
@@ -126,42 +105,6 @@ export function ProjectRunProofView({ run }: { run: ProjectRunProjection }) {
         ? ''
         : String(binding.pullNumber);
 
-  const failedCriteria =
-    proof?.failedCriteria ??
-    facts?.evaluations
-      ?.filter((evaluation) => !evaluation.passed)
-      .map((evaluation) => ({
-        ruleId: evaluation.ruleId,
-        type: evaluation.type,
-        code: evaluation.code,
-      })) ??
-    [];
-  const factTaskIds = proofFactTaskIds(
-    run,
-    facts?.taskKey,
-    facts?.evaluations?.map((evaluation) => evaluation.ruleId) ??
-      failedCriteria.map((item) => item.ruleId),
-  );
-
-  const saveNarrative = async () => {
-    setNarrativeState('saving');
-    setNarrativeError(null);
-    try {
-      const profile = await getOwnerProofProfile();
-      if (!profile) throw new Error('Proof Profile이 없어 서술을 저장할 수 없습니다.');
-      await updateOwnerProofProfile({
-        state: profile.state,
-        displayName: profile.displayName,
-        summary: narrative.trim() || null,
-        idempotencyKey: nanoid(),
-      });
-      setNarrativeState('saved');
-    } catch (error) {
-      setNarrativeState('error');
-      setNarrativeError(error instanceof Error ? error.message : '서술을 저장하지 못했습니다.');
-    }
-  };
-
   return (
     <div className="space-y-6">
       {run.pendingOperation ? (
@@ -169,49 +112,192 @@ export function ProjectRunProofView({ run }: { run: ProjectRunProjection }) {
           className="border-border bg-muted/40 rounded-xl border p-4"
           aria-label="진행 중인 작업"
         >
-          <p className="text-sm font-bold">검증 작업 진행 중</p>
-          <p className="text-muted-foreground mt-1 font-mono text-xs">{run.pendingOperation.id}</p>
-          <p className="text-muted-foreground mt-1 text-xs">종류: {run.pendingOperation.kind}</p>
+          <p className="text-sm font-bold">서버 작업 진행 중</p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            완료 후 최신 실행 상태가 반영됩니다. 이 화면에서는 추가 발행 또는 재검증 요청을 보낼 수
+            없습니다.
+          </p>
+          <details className="mt-3 text-xs">
+            <summary className="text-muted-foreground cursor-pointer">기술 세부 정보</summary>
+            <p className="text-muted-foreground mt-2 font-mono break-all">
+              {run.pendingOperation.id}
+            </p>
+            <p className="text-muted-foreground mt-1">종류: {run.pendingOperation.kind}</p>
+          </details>
         </section>
       ) : null}
 
-      <section
-        role="region"
-        aria-label="저장소 바인딩"
-        className="border-border rounded-xl border p-4"
-      >
-        <h2 className="text-sm font-bold">저장소 바인딩</h2>
-        {binding ? (
-          <>
-            <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-              <div>
-                <dt className="text-muted-foreground text-xs font-bold">저장소</dt>
-                <dd>{repositoryDisplayName ?? binding.githubRepositoryId}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground text-xs font-bold">PR</dt>
-                <dd>{binding.pullNumber != null ? `#${binding.pullNumber}` : '—'}</dd>
-              </div>
-              <div className="sm:col-span-2">
-                <dt className="text-muted-foreground text-xs font-bold">HEAD SHA</dt>
-                <dd className="font-mono text-xs break-all">{binding.headSha ?? '—'}</dd>
-              </div>
-              {binding.pullUrl ? (
-                <div className="sm:col-span-2">
-                  <dt className="text-muted-foreground text-xs font-bold">Pull URL</dt>
-                  <dd>
+      {!proof ? (
+        <section className="border-border rounded-xl border p-4" aria-label="Proof 결과 없음">
+          <h2 className="text-sm font-bold">아직 확인된 실행 결과가 없습니다</h2>
+          <p className="text-muted-foreground mt-1 text-sm">
+            프로젝트 실행에서 검증이 완료되면 결과, 조건, 발행 상태가 여기에 표시됩니다.
+          </p>
+        </section>
+      ) : (
+        <>
+          <section className="border-border rounded-xl border p-4" aria-label="실행 결과 요약">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-sm font-bold">실행 결과</h2>
+              <Badge variant="subtle" intent="neutral">
+                {verificationLabelKo(proof.verification.state)}
+              </Badge>
+            </div>
+            <p className="mt-3 text-base font-semibold">{resultLabel(proof.verification.state)}</p>
+            <p className="text-muted-foreground mt-1 text-sm whitespace-pre-wrap">
+              {proof.summary || '이 실행에 대한 추가 설명은 아직 기록되지 않았습니다.'}
+            </p>
+            {facts?.provider === 'fixture' ? (
+              <p
+                className="border-warning/40 bg-warning/10 mt-4 rounded-lg border p-3 text-sm"
+                role="note"
+                aria-label="fixture 한계"
+              >
+                이 결과는 로컬 fixture 예시입니다. 내 작업의 실패가 아니며, 실제 GitHub 검증 또는
+                공개 증명도 아닙니다.
+              </p>
+            ) : null}
+          </section>
+
+          <section className="border-border rounded-xl border p-4" aria-label="검증 조건과 출처">
+            <h2 className="text-sm font-bold">검증 조건과 출처</h2>
+            {facts ? (
+              <>
+                <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                  <div>
+                    <dt className="text-muted-foreground text-xs font-bold">검증 출처</dt>
+                    <dd>{facts.provider === 'fixture' ? '로컬 fixture 예시' : 'GitHub'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground text-xs font-bold">확인 시각</dt>
+                    <dd>{formatDateTime(facts.observedAt) ?? '기록된 시각 없음'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground text-xs font-bold">검증 완료 시각</dt>
+                    <dd>{formatDateTime(proof.verification.verifiedAt) ?? '아직 완료되지 않음'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground text-xs font-bold">연결된 저장소</dt>
+                    <dd>{repositoryDisplayName ?? facts.repositoryName ?? '기록된 저장소 없음'}</dd>
+                  </div>
+                </dl>
+                {facts.evaluations.length > 0 ? (
+                  <ul
+                    className="border-border mt-4 divide-y rounded-lg border"
+                    aria-label="검증 조건 결과"
+                  >
+                    {facts.evaluations.map((evaluation, index) => (
+                      <li
+                        key={evaluation.ruleId}
+                        className="flex items-center justify-between gap-3 p-3 text-sm"
+                      >
+                        <p className="font-medium">
+                          {criterionLabels[evaluation.type] ?? '검증 조건'} {index + 1}
+                        </p>
+                        <Badge
+                          variant="subtle"
+                          intent={evaluation.passed ? 'success' : 'destructive'}
+                        >
+                          {evaluation.passed ? '통과' : '보완 필요'}
+                        </Badge>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-muted-foreground mt-3 text-sm">
+                    아직 표시할 검증 조건이 없습니다.
+                  </p>
+                )}
+                <details className="border-border mt-4 border-t pt-3 text-xs">
+                  <summary className="text-muted-foreground cursor-pointer">기술 세부 정보</summary>
+                  <dl className="text-muted-foreground mt-3 grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <dt>스냅샷</dt>
+                      <dd className="font-mono break-all">{facts.snapshotId}</dd>
+                    </div>
+                    <div>
+                      <dt>검증 수준</dt>
+                      <dd>{facts.verificationLevel}</dd>
+                    </div>
+                    <div>
+                      <dt>저장소 ID</dt>
+                      <dd className="font-mono break-all">{facts.repositoryId}</dd>
+                    </div>
+                    <div>
+                      <dt>PR / SHA</dt>
+                      <dd className="font-mono break-all">
+                        #{facts.pullNumber} · {facts.headSha}
+                      </dd>
+                    </div>
+                  </dl>
+                  {facts.pullUrl ? (
                     <a
-                      href={binding.pullUrl}
-                      className="text-primary underline"
+                      className="text-primary mt-2 inline-block underline"
+                      href={facts.pullUrl}
                       target="_blank"
                       rel="noreferrer"
                     >
-                      {binding.pullUrl}
+                      연결된 PR 열기
                     </a>
-                  </dd>
-                </div>
-              ) : null}
-            </dl>
+                  ) : null}
+                </details>
+              </>
+            ) : (
+              <p className="text-muted-foreground mt-2 text-sm">
+                기계 검증 사실이 아직 기록되지 않았습니다.
+              </p>
+            )}
+          </section>
+
+          <section className="border-border rounded-xl border p-4" aria-label="설명 범위">
+            <h2 className="text-sm font-bold">설명 범위</h2>
+            <p className="text-muted-foreground mt-2 text-sm">
+              위 설명과 조건은 이 프로젝트 실행에만 적용됩니다. 계정 전체 Proof Profile의 소개,
+              활성화 상태, 다른 공개 결과는 이 실행과 별도로 관리됩니다.
+            </p>
+            <a className="text-primary mt-3 inline-block text-sm underline" href="/profile">
+              계정 프로필 관리로 이동
+            </a>
+          </section>
+
+          <section className="border-border rounded-xl border p-4" aria-label="실행 발행 상태">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-sm font-bold">실행 발행 상태</h2>
+              <Badge variant="subtle" intent="neutral">
+                {publicationLabelKo(proof.publication.state)}
+              </Badge>
+            </div>
+            <p className="text-muted-foreground mt-2 text-sm">
+              이 상태는 이 프로젝트 실행의 발행 기록입니다. 계정 Proof Profile 활성화, lease 유효성,
+              또는 공개 리소스의 존재를 뜻하지 않습니다.
+            </p>
+            <p className="text-muted-foreground mt-2 text-sm">
+              현재 실행의 발행 ID와 공개 Proof Profile 목적지의 연결은 확인되지 않았습니다. 따라서
+              공유 링크나 공개 리소스를 제공하지 않습니다.
+            </p>
+            {proof.validUntil ? (
+              <p className="text-muted-foreground mt-2 text-xs">
+                실행 기록의 유효 기한: {formatDateTime(proof.validUntil) ?? proof.validUntil}
+              </p>
+            ) : null}
+            <div className="mt-4">
+              <PublicationAction run={run} />
+            </div>
+          </section>
+        </>
+      )}
+
+      <section className="border-border rounded-xl border p-4" aria-label="프로젝트 실행 PR 바인딩">
+        <h2 className="text-sm font-bold">프로젝트 실행 PR 바인딩</h2>
+        <p className="text-muted-foreground mt-1 text-sm">
+          이 연결은 선택한 개별 작업이 아니라 프로젝트 실행 전체에 적용됩니다. 작업마다 다른 PR을
+          별도로 연결할 수 있다는 의미는 아닙니다.
+        </p>
+        {binding ? (
+          <>
+            <p className="mt-3 text-sm">
+              현재 연결: {repositoryDisplayName ?? '저장소'} · PR #{binding.pullNumber ?? '없음'}
+            </p>
             <form
               className="border-border mt-4 grid gap-3 border-t pt-4 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-end"
               onSubmit={(event) => {
@@ -223,9 +309,9 @@ export function ProjectRunProofView({ run }: { run: ProjectRunProjection }) {
               }}
             >
               <label className="grid gap-1 text-xs font-bold">
-                GitHub 저장소
+                GitHub 저장소 ID
                 <input
-                  className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+                  className="border-input bg-background h-10 rounded-md border px-3 text-sm"
                   value={repositoryId}
                   onChange={(event) =>
                     setBindingDraft({
@@ -242,7 +328,7 @@ export function ProjectRunProofView({ run }: { run: ProjectRunProjection }) {
               <label className="grid gap-1 text-xs font-bold">
                 PR 번호
                 <input
-                  className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+                  className="border-input bg-background h-10 rounded-md border px-3 text-sm"
                   value={pullNumber}
                   onChange={(event) =>
                     setBindingDraft({
@@ -268,7 +354,7 @@ export function ProjectRunProofView({ run }: { run: ProjectRunProjection }) {
                   !/^[1-9]\d*$/.test(pullNumber)
                 }
               >
-                PR 바인딩
+                프로젝트 실행 PR 저장
               </Button>
             </form>
             {commands.bindPullRequest.error ? (
@@ -278,305 +364,12 @@ export function ProjectRunProofView({ run }: { run: ProjectRunProjection }) {
             ) : null}
           </>
         ) : (
-          <div className="mt-2 space-y-2 text-sm" role="status">
-            <p className="text-muted-foreground">바인딩 정보가 없습니다.</p>
-            <p className="text-muted-foreground text-xs">
-              프로젝트 실행 생성 시 저장소를 연결하면 PR을 바인딩할 수 있습니다.
-            </p>
-          </div>
+          <p className="text-muted-foreground mt-3 text-sm">
+            이 실행에는 저장소 바인딩 정보가 없습니다. 실행 생성 시 지원되는 저장소 연결을 먼저
+            확인해 주세요.
+          </p>
         )}
       </section>
-
-      {!proof ? (
-        <p className="text-muted-foreground text-sm" role="status" aria-label="Proof 미수집">
-          Proof 데이터가 아직 없습니다.
-        </p>
-      ) : (
-        <>
-          <section
-            role="region"
-            aria-label="Proof 사실"
-            className="border-border rounded-xl border p-4"
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-sm font-bold">검증·발행 상태</h2>
-              <Badge variant="subtle" intent="neutral">
-                검증 {verificationLabelKo(proof.verification.state)}
-              </Badge>
-              <Badge variant="subtle" intent="neutral">
-                발행 {publicationLabelKo(proof.publication.state)}
-              </Badge>
-              {proof.validUntil ? (
-                <span className="text-muted-foreground text-xs">유효 기한 {proof.validUntil}</span>
-              ) : null}
-              {formatSnapshotId(proof.publication.supersededSnapshotId) ? (
-                <span className="text-muted-foreground text-xs">
-                  대체된 스냅샷 {formatSnapshotId(proof.publication.supersededSnapshotId)}
-                </span>
-              ) : null}
-            </div>
-
-            {facts ? (
-              <div className="mt-4">
-                <dl className="grid gap-3 text-sm sm:grid-cols-2">
-                  <div>
-                    <dt className="text-muted-foreground text-xs font-bold">스냅샷</dt>
-                    <dd className="font-mono text-xs">{facts.snapshotId}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground text-xs font-bold">검증 수준</dt>
-                    <dd>{facts.verificationLevel}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground text-xs font-bold">검증 출처</dt>
-                    <dd>{facts.provider === 'fixture' ? '로컬 fixture' : 'GitHub'}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground text-xs font-bold">저장소</dt>
-                    <dd>{facts.repositoryName ?? facts.repositoryId}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground text-xs font-bold">PR / SHA</dt>
-                    <dd>
-                      #{facts.pullNumber} ·{' '}
-                      <span className="font-mono text-xs">{facts.headSha}</span>
-                    </dd>
-                  </div>
-                </dl>
-                {facts.provider === 'fixture' ? (
-                  <p
-                    className="text-muted-foreground mt-3 text-xs leading-5"
-                    role="note"
-                    aria-label="검증 출처 안내"
-                  >
-                    로컬 fixture 사실을 기준으로 검증했습니다. 실제 GitHub 검증 결과가 아닙니다.
-                  </p>
-                ) : null}
-                <TaskRequirementLinks run={run} taskIds={factTaskIds} label="사실의 로드맵 근거" />
-                {facts.pullUrl ? (
-                  <p className="mt-2 text-xs">
-                    <a
-                      href={facts.pullUrl}
-                      className="text-primary underline"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Pull URL
-                    </a>
-                  </p>
-                ) : null}
-              </div>
-            ) : (
-              <p className="text-muted-foreground mt-2 text-sm">기계 검증 사실이 아직 없습니다.</p>
-            )}
-
-            {failedCriteria.length > 0 ? (
-              <div className="mt-4">
-                <h3 className="text-sm font-bold">실패한 기준</h3>
-                <table
-                  aria-label="실패한 기준"
-                  className="mt-2 block w-full text-left text-xs sm:table"
-                >
-                  <thead className="sr-only sm:table-header-group">
-                    <tr className="border-border border-b">
-                      <th className="p-2 font-bold">규칙</th>
-                      <th className="p-2 font-bold">유형</th>
-                      <th className="p-2 font-bold">코드</th>
-                      <th className="p-2 font-bold">근거</th>
-                    </tr>
-                  </thead>
-                  <tbody className="block space-y-2 sm:table-row-group sm:space-y-0">
-                    {failedCriteria.map((evaluation) => {
-                      const taskIds = taskIdsForRule(run, evaluation.ruleId);
-                      return (
-                        <tr
-                          key={evaluation.ruleId}
-                          className="border-border grid grid-cols-2 gap-3 rounded-xl border p-3 sm:table-row sm:rounded-none sm:border-0 sm:border-b sm:p-0"
-                        >
-                          <td className="min-w-0 font-mono break-words sm:p-2">
-                            <span
-                              aria-hidden="true"
-                              className="text-muted-foreground mb-1 block font-sans sm:hidden"
-                            >
-                              규칙
-                            </span>
-                            {evaluation.ruleId}
-                          </td>
-                          <td className="min-w-0 sm:p-2">
-                            <span
-                              aria-hidden="true"
-                              className="text-muted-foreground mb-1 block sm:hidden"
-                            >
-                              유형
-                            </span>
-                            {evaluation.type}
-                          </td>
-                          <td className="min-w-0 font-mono break-words sm:p-2">
-                            <span
-                              aria-hidden="true"
-                              className="text-muted-foreground mb-1 block font-sans sm:hidden"
-                            >
-                              코드
-                            </span>
-                            {evaluation.code}
-                          </td>
-                          <td className="col-span-2 min-w-0 sm:table-cell sm:p-2">
-                            <span
-                              aria-hidden="true"
-                              className="text-muted-foreground mb-1 block sm:hidden"
-                            >
-                              근거
-                            </span>
-                            <TaskRequirementLinks run={run} taskIds={taskIds} label="" />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : null}
-
-            {facts && facts.evaluations && facts.evaluations.length > 0 ? (
-              <div className="mt-4">
-                <h3 className="text-sm font-bold">규칙별 결과</h3>
-                <table
-                  aria-label="규칙별 결과"
-                  className="mt-2 block w-full text-left text-xs sm:table"
-                >
-                  <thead className="sr-only sm:table-header-group">
-                    <tr className="border-border border-b">
-                      <th className="p-2 font-bold">규칙</th>
-                      <th className="p-2 font-bold">유형</th>
-                      <th className="p-2 font-bold">결과</th>
-                      <th className="p-2 font-bold">코드</th>
-                      <th className="p-2 font-bold">근거</th>
-                    </tr>
-                  </thead>
-                  <tbody className="block space-y-2 sm:table-row-group sm:space-y-0">
-                    {facts.evaluations.map((evaluation) => (
-                      <tr
-                        key={evaluation.ruleId}
-                        className="border-border grid grid-cols-2 gap-3 rounded-xl border p-3 sm:table-row sm:rounded-none sm:border-0 sm:border-b sm:p-0"
-                      >
-                        <td className="min-w-0 font-mono break-words sm:p-2">
-                          <span
-                            aria-hidden="true"
-                            className="text-muted-foreground mb-1 block font-sans sm:hidden"
-                          >
-                            규칙
-                          </span>
-                          {evaluation.ruleId}
-                        </td>
-                        <td className="min-w-0 sm:p-2">
-                          <span
-                            aria-hidden="true"
-                            className="text-muted-foreground mb-1 block sm:hidden"
-                          >
-                            유형
-                          </span>
-                          {evaluation.type}
-                        </td>
-                        <td className="min-w-0 sm:p-2">
-                          <span
-                            aria-hidden="true"
-                            className="text-muted-foreground mb-1 block sm:hidden"
-                          >
-                            결과
-                          </span>
-                          {evaluation.passed ? '통과' : '실패'}
-                        </td>
-                        <td className="min-w-0 font-mono break-words sm:p-2">
-                          <span
-                            aria-hidden="true"
-                            className="text-muted-foreground mb-1 block font-sans sm:hidden"
-                          >
-                            코드
-                          </span>
-                          {evaluation.code}
-                        </td>
-                        <td className="col-span-2 min-w-0 sm:table-cell sm:p-2">
-                          <span
-                            aria-hidden="true"
-                            className="text-muted-foreground mb-1 block sm:hidden"
-                          >
-                            근거
-                          </span>
-                          <TaskRequirementLinks
-                            run={run}
-                            taskIds={taskIdsForRule(run, evaluation.ruleId)}
-                            label=""
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : null}
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                disabled={commands.publish.isPending}
-                onClick={() => commands.publish.mutate()}
-              >
-                발행
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={commands.unpublish.isPending}
-                onClick={() => commands.unpublish.mutate()}
-              >
-                발행 취소
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={commands.reverify.isPending || Boolean(run.pendingOperation)}
-                onClick={() => commands.reverify.mutate()}
-              >
-                재검증
-              </Button>
-            </div>
-          </section>
-
-          <section
-            aria-label="Proof 서술"
-            className="border-border bg-muted/30 rounded-xl border p-4"
-          >
-            <h2 className="text-sm font-bold">서술 (Narrative)</h2>
-            <p className="text-muted-foreground mt-1 text-xs">
-              이 서술은 immutable 검증 사실과 분리된 owner Proof Profile presentation
-              revision입니다.
-            </p>
-            <Textarea
-              value={narrative}
-              onChange={(event) => {
-                setNarrativeDraft({ source: narrativeSource, value: event.target.value });
-                setNarrativeState('idle');
-              }}
-              aria-label="지원 서술 편집"
-              textareaSize="lg"
-              className="mt-3"
-            />
-            <div className="mt-3 flex items-center gap-2">
-              <Button size="sm" disabled={narrativeState === 'saving'} onClick={saveNarrative}>
-                {narrativeState === 'saving' ? '저장 중' : '서술 저장'}
-              </Button>
-              {narrativeState === 'saved' ? (
-                <span className="text-success text-xs">저장됨</span>
-              ) : null}
-            </div>
-            {narrativeError ? (
-              <p role="alert" className="text-destructive mt-2 text-xs">
-                {narrativeError}
-              </p>
-            ) : null}
-          </section>
-        </>
-      )}
     </div>
   );
 }

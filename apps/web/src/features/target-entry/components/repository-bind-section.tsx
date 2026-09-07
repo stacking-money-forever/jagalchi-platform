@@ -28,14 +28,10 @@ export function RepositoryBindSection({
   onChangeMode: (mode: RepositoryMode) => void;
   onContinue: () => void;
 }) {
-  const modeLabels = allowedModes.map((mode) => repositoryModeLabel(mode)).join(' → ');
-
   return (
     <section className="space-y-4">
       <h2 className="text-lg font-bold">저장소 연결</h2>
-      <p className="text-muted-foreground text-sm">
-        모드 우선순위: {modeLabels}. 기존 저장소를 연결한 뒤 계획을 컴파일할 수 있습니다.
-      </p>
+      <p className="text-muted-foreground text-sm">시작할 작업에 맞는 연결 방법을 선택하세요.</p>
       <div className="flex flex-wrap gap-2">
         {allowedModes.map((mode) => (
           <Button
@@ -70,7 +66,8 @@ export function RepositoryBindSection({
         </label>
       ) : (
         <p className="text-muted-foreground text-sm">
-          {repositoryModeLabel(binding.mode)} 모드는 별도 저장소 선택 없이 진행할 수 있습니다.
+          {repositoryModeLabel(binding.mode)}으로 시작합니다. 이 과정에서 저장소를 새로 만들거나
+          복제하지 않습니다.
         </p>
       )}
       <Button
@@ -83,7 +80,7 @@ export function RepositoryBindSection({
         }
         onClick={onContinue}
       >
-        범위 확인으로 계속
+        시작 내용 확인
       </Button>
     </section>
   );

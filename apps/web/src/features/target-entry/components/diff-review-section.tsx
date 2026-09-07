@@ -48,7 +48,7 @@ export function DiffReviewSection({
 
   return (
     <section className="space-y-4" aria-busy={busy}>
-      <h2 className="text-lg font-bold">Career Diff 검토</h2>
+      <h2 className="text-lg font-bold">준비 상태 확인</h2>
 
       <div className="grid gap-4 md:grid-cols-3">
         <SnapshotBucket title="관측" items={observed.map((item) => item.description)} />
@@ -106,7 +106,7 @@ export function DiffReviewSection({
       </div>
 
       <Button disabled={busy} onClick={onConfirm}>
-        Career Diff 확인
+        이 내용으로 계속
       </Button>
     </section>
   );

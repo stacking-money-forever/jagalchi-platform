@@ -5,14 +5,13 @@ import type { ProjectRunProjection } from '@jagalchi/api-client';
 
 import { ProjectRunProofView } from './project-run-proof-view';
 
-vi.mock('../hooks/use-project-run-commands', () => ({
-  useProjectRunCommands: () => ({
-    bindPullRequest: { isPending: false, error: null, mutate: vi.fn() },
-    publish: { isPending: false, mutate: vi.fn() },
-    unpublish: { isPending: false, mutate: vi.fn() },
-    reverify: { isPending: false, mutate: vi.fn() },
-  }),
-}));
+const commands = {
+  bindPullRequest: { isPending: false, error: null, mutate: vi.fn() },
+  publish: { isPending: false, mutate: vi.fn() },
+  unpublish: { isPending: false, mutate: vi.fn() },
+  reverify: { isPending: false, mutate: vi.fn() },
+};
+vi.mock('../hooks/use-project-run-commands', () => ({ useProjectRunCommands: () => commands }));
 
 const baseRun = {
   id: 'run-1',
@@ -26,52 +25,22 @@ const baseRun = {
 } satisfies Partial<ProjectRunProjection>;
 
 describe('ProjectRunProofView', () => {
-  it('shows repository binding even when proof is absent', () => {
+  it('keeps the no-proof state and project-wide binding scope readable', () => {
     render(
       <ProjectRunProofView
-        run={
-          {
-            ...baseRun,
-            proof: null,
-            repositoryBinding: {
-              githubRepositoryId: '12345',
-              repositoryName: 'fixture/verification-repository',
-              pullNumber: 17,
-              headSha: 'a'.repeat(40),
-              pullUrl: 'https://github.com/fixture/verification-repository/pull/17',
-            },
-          } as ProjectRunProjection
-        }
+        run={{ ...baseRun, proof: null, repositoryBinding: undefined } as ProjectRunProjection}
       />,
     );
-
-    expect(screen.getByLabelText('저장소 바인딩')).toBeInTheDocument();
-    expect(screen.getByText('fixture/verification-repository')).toBeInTheDocument();
-    expect(screen.getByText('Proof 데이터가 아직 없습니다.')).toBeInTheDocument();
-    expect(screen.getByLabelText('GitHub 저장소')).toHaveValue('12345');
-    expect(screen.getByLabelText('PR 번호')).toHaveValue(17);
-  });
-
-  it('shows actionable unmet binding copy when repository name is unavailable', () => {
-    render(
-      <ProjectRunProofView
-        run={
-          {
-            ...baseRun,
-            proof: null,
-            repositoryBinding: undefined,
-          } as ProjectRunProjection
-        }
-      />,
+    expect(screen.getByLabelText('Proof 결과 없음')).toHaveTextContent(
+      '아직 확인된 실행 결과가 없습니다',
     );
-
-    expect(screen.getByText('바인딩 정보가 없습니다.')).toBeInTheDocument();
-    expect(
-      screen.getByText('프로젝트 실행 생성 시 저장소를 연결하면 PR을 바인딩할 수 있습니다.'),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText('프로젝트 실행 PR 바인딩')).toHaveTextContent(
+      '프로젝트 실행 전체에 적용됩니다',
+    );
+    expect(screen.queryByRole('button', { name: /발행|재검증/ })).not.toBeInTheDocument();
   });
 
-  it('separates fixture verification provenance from verification and publication state', () => {
+  it('orders fixture result, conditions, account scope, and publication without a public-link promise', () => {
     render(
       <ProjectRunProofView
         run={
@@ -92,12 +61,7 @@ describe('ProjectRunProofView', () => {
                 headSha: 'a'.repeat(40),
                 observedAt: '2026-09-07T00:00:00Z',
                 evaluations: [
-                  {
-                    ruleId: 'task-1:rule-0',
-                    type: 'MERGED_PR',
-                    passed: true,
-                    code: 'PASS',
-                  },
+                  { ruleId: 'task-1:rule-0', type: 'MERGED_PR', passed: true, code: 'PASS' },
                 ],
               },
             },
@@ -105,14 +69,60 @@ describe('ProjectRunProofView', () => {
         }
       />,
     );
-
-    expect(screen.getByText('검증 통과')).toBeVisible();
-    expect(screen.getByText('발행 발행됨')).toBeVisible();
-    expect(screen.getByText('로컬 fixture')).toBeVisible();
-    expect(screen.getByRole('note', { name: '검증 출처 안내' })).toHaveTextContent(
-      '실제 GitHub 검증 결과가 아닙니다.',
+    const result = screen.getByLabelText('실행 결과 요약');
+    const conditions = screen.getByLabelText('검증 조건과 출처');
+    const scope = screen.getByLabelText('설명 범위');
+    const publication = screen.getByLabelText('실행 발행 상태');
+    expect(
+      result.compareDocumentPosition(conditions) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      conditions.compareDocumentPosition(scope) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      scope.compareDocumentPosition(publication) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.getByRole('note', { name: 'fixture 한계' })).toHaveTextContent(
+      '실제 GitHub 검증 또는 공개 증명도 아닙니다.',
     );
-    expect(screen.getByRole('table', { name: '규칙별 결과' })).toBeVisible();
-    expect(screen.getByText('task-1:rule-0')).toBeVisible();
+    expect(screen.getByText('PR 병합 1')).toBeVisible();
+    expect(screen.getByRole('link', { name: '계정 프로필 관리로 이동' })).toHaveAttribute(
+      'href',
+      '/profile',
+    );
+    expect(publication).toHaveTextContent(
+      '계정 Proof Profile 활성화, lease 유효성, 또는 공개 리소스의 존재를 뜻하지 않습니다.',
+    );
+    expect(screen.queryByText('public-proof-1')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '이 실행의 발행 취소' })).toBeVisible();
+  });
+
+  it('offers one state-valid recovery action and hides it while server work is pending', () => {
+    const staleProof = {
+      summary: '',
+      validUntil: null,
+      verification: { state: 'STALE', verifiedAt: null },
+      publication: { state: 'UNPUBLISHED', publicId: null },
+    };
+    const { rerender } = render(
+      <ProjectRunProofView run={{ ...baseRun, proof: staleProof } as ProjectRunProjection} />,
+    );
+    expect(screen.getByRole('button', { name: '재검증 요청' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /발행/ })).not.toBeInTheDocument();
+    rerender(
+      <ProjectRunProofView
+        run={
+          {
+            ...baseRun,
+            pendingOperation: { id: 'operation-1', kind: 'PROOF_REVERIFICATION' },
+            proof: staleProof,
+          } as ProjectRunProjection
+        }
+      />,
+    );
+    expect(screen.getByLabelText('진행 중인 작업')).toHaveTextContent(
+      '추가 발행 또는 재검증 요청을 보낼 수 없습니다.',
+    );
+    expect(screen.queryByRole('button', { name: /발행|재검증/ })).not.toBeInTheDocument();
   });
 });

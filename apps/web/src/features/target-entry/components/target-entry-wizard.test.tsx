@@ -126,6 +126,14 @@ function completedOperation(id: string, resourceId: string): WorkflowOperationVi
   };
 }
 
+function failedOperation(id: string, code: string): WorkflowOperationView {
+  return {
+    ...pendingOperation(id),
+    state: 'FAILED',
+    error: { code, retryable: true },
+  };
+}
+
 const targetVersion: CareerSnapshotRecord = {
   id: 'target-version-1',
   ownerId: 'owner-1',
@@ -235,18 +243,20 @@ describe('TargetEntryWizard repository mode switching', () => {
     render(<TargetEntryWizard />);
 
     await user.click(screen.getByRole('button', { name: '공고 가져오기' }));
-    await screen.findByRole('heading', { name: 'GitHub 증거 스냅샷 검토' });
-    await user.click(screen.getByRole('button', { name: '증거 스냅샷 확인' }));
-    await screen.findByRole('heading', { name: 'Career Diff 검토' });
-    await user.click(screen.getByRole('button', { name: 'Career Diff 확인' }));
-    await screen.findByRole('heading', { name: '프로젝트 제안 비교' });
+    await screen.findByRole('heading', { name: '가져온 작업 정보 확인' });
+    await user.click(screen.getByRole('button', { name: '이 내용으로 계속' }));
+    await screen.findByRole('heading', { name: '준비 상태 확인' });
+    await user.click(screen.getByRole('button', { name: '이 내용으로 계속' }));
+    await screen.findByRole('heading', { name: '프로젝트 비교 및 선택' });
 
     expect(mocks.getEligibleGithubRepositories).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: '저장소 연결로 계속' }));
     await screen.findByRole('heading', { name: '저장소 연결' });
     expect(
-      screen.getByText('신규 프로젝트 모드는 별도 저장소 선택 없이 진행할 수 있습니다.'),
+      screen.getByText(
+        '새 작업으로 시작으로 시작합니다. 이 과정에서 저장소를 새로 만들거나 복제하지 않습니다.',
+      ),
     ).toBeInTheDocument();
     expect(mocks.getEligibleGithubRepositories).not.toHaveBeenCalled();
 
@@ -260,5 +270,45 @@ describe('TargetEntryWizard repository mode switching', () => {
 
     await user.click(screen.getByRole('button', { name: '기존 저장소' }));
     expect(mocks.getEligibleGithubRepositories).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('TargetEntryWizard decision groups and recovery', () => {
+  it('shows three user decision groups and waits for explicit review confirmation', async () => {
+    const user = userEvent.setup();
+    render(<TargetEntryWizard />);
+
+    expect(screen.getByRole('list', { name: '프로젝트 시작 단계' })).toHaveTextContent(
+      '목표와 기존 작업',
+    );
+    expect(screen.getByRole('list', { name: '프로젝트 시작 단계' })).toHaveTextContent(
+      '프로젝트 비교/선택',
+    );
+    expect(screen.getByRole('list', { name: '프로젝트 시작 단계' })).toHaveTextContent(
+      '저장소 연결/시작',
+    );
+    expect(screen.queryByText(/Phase 2|WorkflowOperation|Retry-After/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '공고 가져오기' }));
+    await screen.findByRole('heading', { name: '가져온 작업 정보 확인' });
+    expect(mocks.confirmCandidateProfileSnapshot).not.toHaveBeenCalled();
+    expect(mocks.confirmCareerDiffSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('keeps the URL and exposes manual capture after a fetch failure', async () => {
+    const user = userEvent.setup();
+    mocks.pollUntilTerminal.mockResolvedValueOnce(
+      failedOperation('target-import-op', 'TARGET_FETCH_FAILED'),
+    );
+    render(<TargetEntryWizard />);
+
+    const url = screen.getByLabelText('공고 URL');
+    await user.clear(url);
+    await user.type(url, 'https://example.com/jobs/role');
+    await user.click(screen.getByRole('button', { name: '공고 가져오기' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('공고를 가져오지 못했습니다');
+    expect(screen.getByLabelText('공고 URL')).toHaveValue('https://example.com/jobs/role');
+    expect(screen.getByLabelText('수동 캡처 본문')).toBeInTheDocument();
   });
 });

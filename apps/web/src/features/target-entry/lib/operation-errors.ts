@@ -15,18 +15,18 @@ const OPERATION_COPY: Record<
   Pick<OperationFailureView, 'title' | 'message' | 'retryable'>
 > = {
   INSUFFICIENT_QUALIFIED_PROPOSALS: {
-    title: '제안 3개를 만들지 못했습니다',
-    message: '제약을 조정하거나 다시 생성해 주세요.',
+    title: '비교할 프로젝트를 준비하지 못했습니다',
+    message: '입력과 확인한 내용을 유지했습니다. 잠시 후 다시 시도해 주세요.',
     retryable: false,
   },
   AI_CONTRACT_INVALID: {
-    title: '계약 검증에 실패했습니다',
-    message: '입력 상태를 확인한 뒤 다시 시도해 주세요.',
+    title: '프로젝트를 준비하지 못했습니다',
+    message: '입력과 확인한 내용을 유지했습니다. 다시 시도해 주세요.',
     retryable: false,
   },
   EVIDENCE_RULE_UNSUPPORTED: {
-    title: '지원하지 않는 증거 규칙',
-    message: '다른 제안을 선택하거나 제약을 조정해 주세요.',
+    title: '이 프로젝트는 지금 시작할 수 없습니다',
+    message: '다른 프로젝트를 선택하거나 이전 확인 내용을 검토해 주세요.',
     retryable: false,
   },
   AI_SERVICE_UNAVAILABLE: {
@@ -35,8 +35,8 @@ const OPERATION_COPY: Record<
     retryable: true,
   },
   AI_REQUEST_REJECTED: {
-    title: 'AI 요청이 거절됐습니다',
-    message: '입력을 확인한 뒤 다시 시도해 주세요.',
+    title: '프로젝트를 준비하지 못했습니다',
+    message: '입력과 확인한 내용을 유지했습니다. 다시 시도해 주세요.',
     retryable: true,
   },
   TARGET_FETCH_FAILED: {
@@ -62,8 +62,7 @@ export function mapWorkflowOperationFailure(
   }
   return {
     title: '작업이 실패했습니다',
-    message: error.code,
-    code: error.code,
+    message: '입력과 확인한 내용을 유지했습니다. 잠시 후 다시 시도해 주세요.',
     retryable: error.retryable,
   };
 }

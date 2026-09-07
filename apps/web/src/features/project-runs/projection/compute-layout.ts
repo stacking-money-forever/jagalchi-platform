@@ -1,7 +1,4 @@
-/**
- * Dagre layout for the read-only execution roadmap map.
- */
-
+/** Dagre layout for the read-only execution roadmap map. */
 import dagre from '@dagrejs/dagre';
 
 import type {
@@ -12,22 +9,6 @@ import type {
   RoadmapTask,
 } from './types';
 
-function dependentsOf(tasks: RoadmapTask[], anchorId: string): string[] {
-  const out: string[] = [];
-  const stack = [anchorId];
-  while (stack.length > 0) {
-    const cur = stack.pop();
-    if (cur === undefined) break;
-    for (const t of tasks) {
-      if (t.prerequisiteIds.includes(cur) && !out.includes(t.id)) {
-        out.push(t.id);
-        stack.push(t.id);
-      }
-    }
-  }
-  return out;
-}
-
 export const NODE_W = 248;
 export const NODE_H = 96;
 export const MILESTONE_PAD_X = 28;
@@ -35,171 +16,197 @@ export const MILESTONE_PAD_TOP = 64;
 export const MILESTONE_PAD_BOTTOM = 24;
 export const MILESTONE_GAP_X = 96;
 export const MILESTONE_GAP_Y = 72;
+export const UNGROUPED_MILESTONE_ID = '__ungrouped__';
+const UNGROUPED_MILESTONE_TITLE = '분류되지 않은 작업';
+
+function dependentsOf(tasks: RoadmapTask[], anchorId: string): string[] {
+  const out: string[] = [];
+  const stack = [anchorId];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) continue;
+    for (const task of tasks) {
+      if (task.prerequisiteIds.includes(current) && !out.includes(task.id)) {
+        out.push(task.id);
+        stack.push(task.id);
+      }
+    }
+  }
+  return out;
+}
 
 /**
- * Dagre top-to-bottom layout. Runs only when plan revision or collapse state
- * changes (caller responsibility). Collapsed milestones shrink to a single
- * summary node; their tasks are removed from the graph entirely.
+ * Produces finite milestone containers even for empty stages and keeps valid
+ * tasks with a null milestone in a presentation-only ungrouped lane.
  */
 export function computeLayout(
   model: RoadmapGraphModel,
   pathTaskIds: string[],
   collapsedMilestoneIds: readonly string[],
 ): RoadmapGraph {
-  const collapsed: Record<string, boolean> = {};
-  for (const id of collapsedMilestoneIds) collapsed[id] = true;
+  const collapsed = new Set(collapsedMilestoneIds);
+  const knownMilestoneIds = new Set(model.milestones.map((milestone) => milestone.id));
+  const groupId = (task: RoadmapTask): string =>
+    task.milestoneId && knownMilestoneIds.has(task.milestoneId)
+      ? task.milestoneId
+      : UNGROUPED_MILESTONE_ID;
+  const milestones = model.tasks.some((task) => groupId(task) === UNGROUPED_MILESTONE_ID)
+    ? [...model.milestones, { id: UNGROUPED_MILESTONE_ID, title: UNGROUPED_MILESTONE_TITLE }]
+    : model.milestones;
+  const visibleTasks = model.tasks.filter((task) => !collapsed.has(groupId(task)));
+  const collapsedMilestones = milestones.filter((milestone) => collapsed.has(milestone.id));
+  const graph = new dagre.graphlib.Graph();
+  graph.setGraph({ rankdir: 'TB', nodesep: 24, ranksep: 56, marginx: 24, marginy: 24 });
+  graph.setDefaultEdgeLabel(() => ({}));
 
-  const g = new dagre.graphlib.Graph();
-  g.setGraph({ rankdir: 'TB', nodesep: 24, ranksep: 56, marginx: 24, marginy: 24 });
-  g.setDefaultEdgeLabel(() => ({}));
-
-  const visibleTasks = model.tasks.filter((t) => !collapsed[t.milestoneId]);
-  const collapsedMilestones = model.milestones.filter((m) => collapsed[m.id]);
-
-  for (const t of visibleTasks) g.setNode(t.id, { width: NODE_W, height: NODE_H });
-  for (const m of collapsedMilestones) {
-    g.setNode(`ms-${m.id}`, { width: NODE_W + 2 * MILESTONE_PAD_X, height: 72 });
+  for (const task of visibleTasks) graph.setNode(task.id, { width: NODE_W, height: NODE_H });
+  for (const milestone of collapsedMilestones) {
+    graph.setNode(`ms-${milestone.id}`, { width: NODE_W + 2 * MILESTONE_PAD_X, height: 72 });
   }
-  g.setNode('proof', { width: NODE_W, height: 72 });
+  graph.setNode('proof', { width: NODE_W, height: 72 });
 
-  for (const t of visibleTasks) {
-    for (const p of t.prerequisiteIds) {
-      if (visibleTasks.some((v) => v.id === p)) {
-        g.setEdge(p, t.id);
-      } else if (collapsed[model.tasks.find((x) => x.id === p)?.milestoneId ?? '']) {
-        // Cross-collapse edge: land on the collapsed milestone node.
-        const srcMilestone = model.tasks.find((x) => x.id === p)?.milestoneId;
-        if (srcMilestone) g.setEdge(`ms-${srcMilestone}`, t.id);
+  for (const task of visibleTasks) {
+    for (const prerequisiteId of task.prerequisiteIds) {
+      if (visibleTasks.some((candidate) => candidate.id === prerequisiteId)) {
+        graph.setEdge(prerequisiteId, task.id);
+        continue;
+      }
+      const prerequisite = model.tasks.find((candidate) => candidate.id === prerequisiteId);
+      if (prerequisite && collapsed.has(groupId(prerequisite))) {
+        graph.setEdge(`ms-${groupId(prerequisite)}`, task.id);
       }
     }
   }
-  // Collapsed milestone -> tasks that depend on anything inside it (already
-  // added above); also sequence collapsed milestones into the flow.
-  for (const m of collapsedMilestones) {
-    const lastTask = [...model.tasks].reverse().find((t) => t.milestoneId === m.id);
-    if (lastTask) {
-      for (const dep of dependentsOf(model.tasks, lastTask.id)) {
-        const dt = model.tasks.find((x) => x.id === dep);
-        if (
-          dt &&
-          !collapsed[dt.milestoneId] &&
-          !dt.prerequisiteIds.some((p) => {
-            const pt = model.tasks.find((x) => x.id === p);
-            return pt?.milestoneId === m.id;
-          })
-        ) {
-          g.setEdge(`ms-${m.id}`, dep);
-        }
-      }
-    }
-  }
+  dagre.layout(graph);
 
-  dagre.layout(g);
-
-  const nodes: RoadmapNode[] = [];
-  const path: Record<string, boolean> = {};
-  for (const id of pathTaskIds) path[id] = true;
-
-  for (const t of visibleTasks) {
-    const n = g.node(t.id);
-    nodes.push({
-      id: t.id,
+  const taskNodes: RoadmapNode[] = visibleTasks.map((task) => {
+    const position = graph.node(task.id);
+    return {
+      id: task.id,
       type: 'task',
-      position: { x: n.x - NODE_W / 2, y: n.y - NODE_H / 2 },
-      parentId: t.milestoneId,
+      position: { x: position.x - NODE_W / 2, y: position.y - NODE_H / 2 },
+      parentId: groupId(task),
       extent: 'parent',
-      data: { kind: 'task', task: t, milestoneId: t.milestoneId, collapsed: false },
-    });
-  }
+      data: { kind: 'task', task, milestoneId: groupId(task), collapsed: false },
+    };
+  });
 
-  // Milestone containers must precede children (React Flow sub-flow rule).
-  for (const m of model.milestones) {
-    if (collapsed[m.id]) {
-      const n = g.node(`ms-${m.id}`);
-      nodes.push({
-        id: m.id,
+  // Empty groups receive a finite fallback placement; no Math.min([]) layout.
+  const containers: RoadmapNode[] = milestones.map((milestone, index) => {
+    const allMembers = model.tasks.filter((task) => groupId(task) === milestone.id);
+    const members = visibleTasks.filter((task) => groupId(task) === milestone.id);
+    const doneCount = allMembers.filter((task) => task.state === 'DONE').length;
+    const blockerCount = allMembers.filter((task) => task.state === 'BLOCKED').length;
+    if (collapsed.has(milestone.id)) {
+      const position = graph.node(`ms-${milestone.id}`) ?? { x: 24 + index * 48, y: 24 };
+      return {
+        id: milestone.id,
         type: 'milestone',
-        position: { x: n.x - (NODE_W / 2 + MILESTONE_PAD_X), y: n.y - 36 },
+        position: { x: position.x - (NODE_W / 2 + MILESTONE_PAD_X), y: position.y - 36 },
         data: {
           kind: 'milestone',
-          milestoneId: m.id,
-          milestoneTitle: m.title,
+          milestoneId: milestone.id,
+          milestoneTitle: milestone.title,
           collapsed: true,
-          doneCount: model.tasks.filter((t) => t.milestoneId === m.id && t.state === 'DONE').length,
-          totalCount: model.tasks.filter((t) => t.milestoneId === m.id).length,
-          blockerCount: model.tasks.filter((t) => t.milestoneId === m.id && t.state === 'BLOCKED')
-            .length,
+          doneCount,
+          totalCount: allMembers.length,
+          blockerCount,
         },
-      });
-      continue;
+      };
     }
-    const members = visibleTasks.filter((t) => t.milestoneId === m.id);
-    const xs = members.map((t) => nodes.find((n) => n.id === t.id)!.position.x);
-    const ys = members.map((t) => nodes.find((n) => n.id === t.id)!.position.y);
-    const minX = Math.min(...xs) - MILESTONE_PAD_X;
-    const minY = Math.min(...ys) - MILESTONE_PAD_TOP;
-    const maxX = Math.max(...xs.map((x) => x + NODE_W)) + MILESTONE_PAD_X;
-    const maxY = Math.max(...ys.map((y) => y + NODE_H)) + MILESTONE_PAD_BOTTOM;
-    nodes.push({
-      id: m.id,
+    const memberNodes = members.flatMap((task) => taskNodes.filter((node) => node.id === task.id));
+    const xs = memberNodes.map((node) => node.position.x);
+    const ys = memberNodes.map((node) => node.position.y);
+    const minX = xs.length
+      ? Math.min(...xs) - MILESTONE_PAD_X
+      : 24 + index * (NODE_W + MILESTONE_GAP_X);
+    const minY = ys.length ? Math.min(...ys) - MILESTONE_PAD_TOP : 24;
+    const maxX = xs.length
+      ? Math.max(...xs.map((x) => x + NODE_W)) + MILESTONE_PAD_X
+      : minX + NODE_W + 2 * MILESTONE_PAD_X;
+    const maxY = ys.length
+      ? Math.max(...ys.map((y) => y + NODE_H)) + MILESTONE_PAD_BOTTOM
+      : minY + 72;
+    return {
+      id: milestone.id,
       type: 'milestone',
       position: { x: minX, y: minY },
       style: { width: maxX - minX, height: maxY - minY },
       data: {
         kind: 'milestone',
-        milestoneId: m.id,
-        milestoneTitle: m.title,
+        milestoneId: milestone.id,
+        milestoneTitle: milestone.title,
         collapsed: false,
-        doneCount: model.tasks.filter((t) => t.milestoneId === m.id && t.state === 'DONE').length,
-        totalCount: model.tasks.filter((t) => t.milestoneId === m.id).length,
-        blockerCount: model.tasks.filter((t) => t.milestoneId === m.id && t.state === 'BLOCKED')
-          .length,
+        doneCount,
+        totalCount: allMembers.length,
+        blockerCount,
       },
-    });
-  }
-
-  const proofDone = model.tasks.every((t) => t.state === 'DONE');
-  const pn = g.node('proof');
-  nodes.push({
-    id: 'proof',
-    type: 'proof',
-    position: { x: pn.x - NODE_W / 2, y: pn.y - 36 },
-    data: {
-      kind: 'proof',
-      milestoneId: model.milestones[model.milestones.length - 1]?.id ?? 'proof',
-      doneCount: proofDone ? 1 : 0,
-      totalCount: 1,
-    },
+    };
   });
 
-  const edges: RoadmapEdge[] = [];
-  const edgeIds: Record<string, boolean> = {};
-  for (const t of visibleTasks) {
-    for (const p of t.prerequisiteIds) {
-      const pTask = model.tasks.find((x) => x.id === p);
-      if (visibleTasks.some((v) => v.id === p)) {
-        const id = `e-${p}-${t.id}`;
-        if (!edgeIds[id]) {
-          edgeIds[id] = true;
-          edges.push({ id, source: p, target: t.id, kind: 'PREREQUISITE' });
-        }
-      } else if (pTask && collapsed[pTask.milestoneId]) {
-        const id = `e-ms-${pTask.milestoneId}-${t.id}`;
-        if (!edgeIds[id]) {
-          edgeIds[id] = true;
-          edges.push({ id, source: pTask.milestoneId, target: t.id, kind: 'PREREQUISITE' });
-        }
-      }
-    }
-  }
-  const lastMilestoneId = model.milestones[model.milestones.length - 1]?.id;
-  if (lastMilestoneId) {
-    for (const t of model.tasks.filter((x) => x.milestoneId === lastMilestoneId)) {
-      if (!collapsed[lastMilestoneId] && dependentsOf(model.tasks, t.id).length === 0) {
-        edges.push({ id: `e-${t.id}-proof`, source: t.id, target: 'proof', kind: 'SEQUENCE' });
-      }
+  // React Flow child coordinates are relative to the parent container.
+  const containerPositions = new Map(containers.map((node) => [node.id, node.position]));
+  for (const node of taskNodes) {
+    const parentPosition = node.parentId ? containerPositions.get(node.parentId) : undefined;
+    if (parentPosition) {
+      node.position = {
+        x: node.position.x - parentPosition.x,
+        y: node.position.y - parentPosition.y,
+      };
     }
   }
 
+  // An empty plan is not proof-ready. Completion alone never claims publication.
+  const proofPosition = graph.node('proof');
+  const completedTaskPlan =
+    model.tasks.length > 0 && model.tasks.every((task) => task.state === 'DONE');
+  const nodes: RoadmapNode[] = [
+    ...containers,
+    ...taskNodes,
+    {
+      id: 'proof',
+      type: 'proof',
+      position: { x: proofPosition.x - NODE_W / 2, y: proofPosition.y - 36 },
+      data: {
+        kind: 'proof',
+        milestoneId: milestones.at(-1)?.id ?? 'proof',
+        doneCount: completedTaskPlan ? 1 : 0,
+        totalCount: 1,
+        proofState: model.proof,
+      },
+    },
+  ];
+
+  const edges: RoadmapEdge[] = [];
+  const edgeIds = new Set<string>();
+  for (const task of visibleTasks) {
+    for (const prerequisiteId of task.prerequisiteIds) {
+      const prerequisite = model.tasks.find((candidate) => candidate.id === prerequisiteId);
+      const source = visibleTasks.some((candidate) => candidate.id === prerequisiteId)
+        ? prerequisiteId
+        : prerequisite && collapsed.has(groupId(prerequisite))
+          ? groupId(prerequisite)
+          : null;
+      if (!source) continue;
+      const id = `e-${source}-${task.id}`;
+      if (!edgeIds.has(id)) {
+        edgeIds.add(id);
+        edges.push({ id, source, target: task.id, kind: 'PREREQUISITE' });
+      }
+    }
+  }
+  const lastMilestoneId = milestones.at(-1)?.id;
+  if (lastMilestoneId) {
+    for (const task of visibleTasks.filter((candidate) => groupId(candidate) === lastMilestoneId)) {
+      if (dependentsOf(model.tasks, task.id).length === 0) {
+        edges.push({
+          id: `e-${task.id}-proof`,
+          source: task.id,
+          target: 'proof',
+          kind: 'SEQUENCE',
+        });
+      }
+    }
+  }
   return { nodes, edges, pathTaskIds: [...pathTaskIds] };
 }

@@ -1,6 +1,5 @@
 'use client';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -29,12 +28,7 @@ export function ProposalComparisonGrid({
               selected && 'border-primary ring-primary/30 ring-2',
             )}
           >
-            <div className="flex items-start justify-between gap-2">
-              <h3 className="text-lg font-bold">{proposal.title}</h3>
-              <Badge intent="primary" variant="subtle">
-                #{proposal.rank}
-              </Badge>
-            </div>
+            <h3 className="text-lg font-bold">{proposal.title}</h3>
             <dl className="mt-4 space-y-3 text-sm">
               <div>
                 <dt className="font-semibold">인용 요구사항</dt>
@@ -65,16 +59,6 @@ export function ProposalComparisonGrid({
                 <dd className="text-muted-foreground">
                   {proposal.nonGoals.length > 0 ? proposal.nonGoals.join(' · ') : '없음'}
                 </dd>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <dt className="font-semibold">예상 기간</dt>
-                  <dd>{proposal.durationHours ? `${proposal.durationHours}시간` : '미정'}</dd>
-                </div>
-                <div>
-                  <dt className="font-semibold">난이도</dt>
-                  <dd>{proposal.difficulty}</dd>
-                </div>
               </div>
               <div>
                 <dt className="font-semibold">증거 규칙</dt>

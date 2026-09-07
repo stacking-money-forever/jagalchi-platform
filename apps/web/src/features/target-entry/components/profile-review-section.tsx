@@ -53,7 +53,7 @@ export function ProfileReviewSection({
 
   return (
     <section className="space-y-4" aria-busy={busy}>
-      <h2 className="text-lg font-bold">GitHub 증거 스냅샷 검토</h2>
+      <h2 className="text-lg font-bold">가져온 작업 정보 확인</h2>
 
       {repositories.length > 0 ? (
         <div className="border-border rounded-xl border p-4">
@@ -132,7 +132,7 @@ export function ProfileReviewSection({
       </div>
 
       <Button disabled={busy} onClick={onConfirm}>
-        증거 스냅샷 확인
+        이 내용으로 계속
       </Button>
     </section>
   );
