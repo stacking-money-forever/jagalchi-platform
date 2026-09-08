@@ -45,7 +45,9 @@ jobs:
   browser:
     name: Browser E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The suite currently runs 76 tests serially and retries failures in CI.
+    # Keep a fail-safe while allowing the complete suite to finish on hosted runners.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
