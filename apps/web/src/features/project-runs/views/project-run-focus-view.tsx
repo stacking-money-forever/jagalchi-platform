@@ -36,7 +36,8 @@ function commandErrorCopy(error: unknown): string {
   return '작업을 처리하지 못했습니다. 잠시 후 최신 상태에서 다시 시도하세요.';
 }
 
-type TaskDraft = { pullNumber: string };
+type TaskDraft = { pullNumber: string; blockNote: string; aiQuestion: string };
+type ActionKind = 'start' | 'defer' | 'block' | 'resume' | 'verify' | 'aiHelp' | 'bindPullRequest';
 
 /** Reading-first task document. Selection is navigation only; commands remain server-authoritative. */
 export function ProjectRunFocusView({
@@ -52,11 +53,16 @@ export function ProjectRunFocusView({
 }) {
   const commands = useProjectRunCommands(run);
   const [bindingDrafts, setBindingDrafts] = useState<Record<string, TaskDraft>>({});
-  const [actionTaskId, setActionTaskId] = useState<string | null>(null);
+  const [activeAction, setActiveAction] = useState<{
+    taskId: string;
+    kind: ActionKind;
+  } | null>(null);
   const current = taskById(model, run.currentTaskId);
   const recommended = taskById(model, run.recommendedTaskId);
   const focusTask = taskById(model, selectedTaskId) ?? current ?? recommended;
   const focusTaskRow = run.tasks.find((task) => task.id === focusTask?.id);
+  const citationsById = new Map((run.citations ?? []).map((citation) => [citation.id, citation]));
+  const gapsById = new Map((run.gaps ?? []).map((gap) => [gap.id, gap]));
   const selectTask = onTaskSelect ?? (() => undefined);
   const binding = run.repositoryBinding;
   const hasRepository = Boolean(binding?.githubRepositoryId);
@@ -64,24 +70,45 @@ export function ProjectRunFocusView({
   const repositoryLabel = resolveRepositoryDisplayName(binding, run.proof?.facts);
   const pending = Boolean(run.pendingOperation);
   const isCurrent = focusTask?.id === run.currentTaskId;
-  const commandError = [
-    commands.start.error,
-    commands.resume.error,
-    commands.verify.error,
-    commands.bindPullRequest.error,
-  ].find(Boolean);
-  const showError = Boolean(commandError && actionTaskId === focusTask?.id);
+  const isRecommended = focusTask?.id === run.recommendedTaskId;
+  const isServerEligibleReady = Boolean(
+    focusTask?.state === 'READY' &&
+    (!run.eligibleReadyTaskIds || run.eligibleReadyTaskIds.includes(focusTask.id)),
+  );
+  const canStart = Boolean(
+    isServerEligibleReady && (!run.currentTaskId || run.currentTaskId === focusTask?.id),
+  );
+  const canDefer = Boolean(focusTask?.state === 'READY' && !focusTask.required);
+  const canBlock = Boolean(
+    (focusTask?.state === 'READY' && focusTask.required) ||
+    (focusTask?.state === 'IN_PROGRESS' && isCurrent),
+  );
+  const canResume = Boolean(
+    focusTask?.state === 'DEFERRED' ||
+    (focusTask?.state === 'BLOCKED' && (!run.currentTaskId || isCurrent)),
+  );
+  const commandError = activeAction ? commands[activeAction.kind].error : null;
+  const showError = Boolean(commandError && activeAction?.taskId === focusTask?.id);
   const bindingDraft = focusTask
     ? (bindingDrafts[focusTask.id] ?? {
         pullNumber: binding?.pullNumber == null ? '' : String(binding.pullNumber),
+        blockNote: '',
+        aiQuestion: '',
       })
     : null;
   const actionPending =
     pending ||
     commands.start.isPending ||
+    commands.defer.isPending ||
+    commands.block.isPending ||
     commands.resume.isPending ||
     commands.verify.isPending ||
+    commands.aiHelp.isPending ||
     commands.bindPullRequest.isPending;
+  const aiHelpResult =
+    activeAction?.kind === 'aiHelp' && activeAction.taskId === focusTask?.id
+      ? commands.aiHelp.data
+      : null;
 
   const setBindingDraft = (patch: Partial<TaskDraft>) => {
     if (!focusTask || !bindingDraft) return;
@@ -90,8 +117,8 @@ export function ProjectRunFocusView({
       [focusTask.id]: { ...bindingDraft, ...patch },
     }));
   };
-  const command = (taskId: string, operation: () => void) => {
-    setActionTaskId(taskId);
+  const command = (kind: ActionKind, taskId: string, operation: () => void) => {
+    setActiveAction({ taskId, kind });
     operation();
   };
 
@@ -117,12 +144,55 @@ export function ProjectRunFocusView({
                 지금 할 작업
               </Badge>
             ) : null}
+            {isRecommended && !isCurrent ? (
+              <Badge variant="subtle" intent="neutral">
+                다음 추천 작업
+              </Badge>
+            ) : null}
           </div>
           <div>
             <p className="text-muted-foreground text-sm font-medium">현재 작업</p>
             <h2 className="mt-1 text-2xl font-bold tracking-tight">{focusTask.title}</h2>
             <p className="text-muted-foreground mt-3 max-w-3xl leading-7">{focusTask.purpose}</p>
           </div>
+          <section>
+            <h3 className="text-sm font-bold">인용된 채용 요구사항</h3>
+            <ul className="mt-2 space-y-2 text-sm">
+              {(focusTaskRow?.citationIds ?? []).map((id) => {
+                const citation = citationsById.get(id);
+                if (!citation) return null;
+                return (
+                  <li key={id} className="border-border min-w-0 rounded-lg border p-3">
+                    <p className="font-bold">{citation.label}</p>
+                    {citation.quote ? (
+                      <p className="text-muted-foreground mt-1 text-xs leading-5 break-all">
+                        {citation.quote}
+                      </p>
+                    ) : null}
+                  </li>
+                );
+              })}
+              {(focusTaskRow?.citationIds ?? []).length === 0 ? (
+                <li className="text-muted-foreground">연결된 인용이 없습니다.</li>
+              ) : null}
+            </ul>
+          </section>
+          <section>
+            <h3 className="text-sm font-bold">커리어 갭</h3>
+            <ul className="mt-2 space-y-2 text-sm">
+              {(focusTaskRow?.gapIds ?? []).map((id) => {
+                const gap = gapsById.get(id);
+                return gap ? (
+                  <li key={id} className="border-border rounded-lg border p-3 break-all">
+                    {gap.description}
+                  </li>
+                ) : null;
+              })}
+              {(focusTaskRow?.gapIds ?? []).length === 0 ? (
+                <li className="text-muted-foreground">연결된 갭이 없습니다.</li>
+              ) : null}
+            </ul>
+          </section>
           <section aria-labelledby={`outcome-${focusTask.id}`}>
             <h3 id={`outcome-${focusTask.id}`} className="text-sm font-bold">
               만들어야 할 결과
@@ -157,6 +227,17 @@ export function ProjectRunFocusView({
               </p>
             )}
           </section>
+          {focusTask.state === 'IN_PROGRESS' && focusTaskRow?.verificationFailure ? (
+            <section className="border-warning bg-warning-subtle rounded-xl border p-4">
+              <h3 className="text-sm font-bold">검증 실패</h3>
+              <p className="mt-2 font-mono text-xs">{focusTaskRow.verificationFailure.code}</p>
+              {focusTaskRow.verificationFailure.note ? (
+                <p className="text-muted-foreground mt-2 text-sm">
+                  {focusTaskRow.verificationFailure.note}
+                </p>
+              ) : null}
+            </section>
+          ) : null}
           {showError ? (
             <p
               role="alert"
@@ -175,22 +256,79 @@ export function ProjectRunFocusView({
                 보관된 프로젝트라서 작업을 변경할 수 없습니다.
               </p>
             ) : null}
-            {!pending && run.state !== 'ARCHIVED' && !isCurrent ? (
+            {!pending &&
+            run.state !== 'ARCHIVED' &&
+            !isCurrent &&
+            !canStart &&
+            !canDefer &&
+            !canBlock &&
+            !canResume ? (
               <p className="text-muted-foreground text-sm">
                 이 작업은 여정을 살펴보기 위한 선택입니다. 현재 작업을 완료한 뒤 서버가 다음 행동을
                 안내합니다.
               </p>
             ) : null}
-            {!pending && run.state !== 'ARCHIVED' && isCurrent && focusTask.state === 'READY' ? (
+            {!pending && run.state !== 'ARCHIVED' && canStart ? (
               <Button
                 className="min-h-11"
                 disabled={actionPending}
                 onClick={() =>
-                  command(focusTask.id, () => commands.start.mutate({ taskId: focusTask.id }))
+                  command('start', focusTask.id, () =>
+                    commands.start.mutate({ taskId: focusTask.id }),
+                  )
                 }
               >
                 작업 시작
               </Button>
+            ) : null}
+            {!pending &&
+            run.state !== 'ARCHIVED' &&
+            isServerEligibleReady &&
+            run.currentTaskId &&
+            !isCurrent ? (
+              <p className="text-muted-foreground text-sm">
+                다른 현재 작업이 진행 중이라 이 작업은 아직 시작할 수 없습니다.
+              </p>
+            ) : null}
+            {!pending && run.state !== 'ARCHIVED' && canDefer ? (
+              <Button
+                className="min-h-11"
+                variant="outline"
+                disabled={actionPending}
+                onClick={() =>
+                  command('defer', focusTask.id, () =>
+                    commands.defer.mutate({ taskId: focusTask.id }),
+                  )
+                }
+              >
+                보류
+              </Button>
+            ) : null}
+            {!pending && run.state !== 'ARCHIVED' && canBlock && bindingDraft ? (
+              <div className="mt-3 space-y-2">
+                <Input
+                  aria-label="막힘 기록 메모"
+                  value={bindingDraft.blockNote}
+                  onChange={(event) => setBindingDraft({ blockNote: event.target.value })}
+                  placeholder="막힘 사유 메모 (선택)"
+                />
+                <Button
+                  className="min-h-11"
+                  variant="outline"
+                  disabled={actionPending}
+                  onClick={() =>
+                    command('block', focusTask.id, () =>
+                      commands.block.mutate({
+                        taskId: focusTask.id,
+                        reasonCode: 'USER_REQUESTED',
+                        note: bindingDraft.blockNote.trim() || undefined,
+                      }),
+                    )
+                  }
+                >
+                  막힘 기록
+                </Button>
+              </div>
             ) : null}
             {!pending &&
             run.state !== 'ARCHIVED' &&
@@ -213,7 +351,7 @@ export function ProjectRunFocusView({
                 className="space-y-3"
                 onSubmit={(event) => {
                   event.preventDefault();
-                  command(focusTask.id, () =>
+                  command('bindPullRequest', focusTask.id, () =>
                     commands.bindPullRequest.mutate({
                       githubRepositoryId: binding!.githubRepositoryId,
                       pullNumber: Number(bindingDraft.pullNumber),
@@ -260,19 +398,23 @@ export function ProjectRunFocusView({
                   className="min-h-11"
                   disabled={actionPending}
                   onClick={() =>
-                    command(focusTask.id, () => commands.verify.mutate({ taskId: focusTask.id }))
+                    command('verify', focusTask.id, () =>
+                      commands.verify.mutate({ taskId: focusTask.id }),
+                    )
                   }
                 >
                   결과 확인 요청
                 </Button>
               </div>
             ) : null}
-            {!pending && run.state !== 'ARCHIVED' && isCurrent && focusTask.state === 'DEFERRED' ? (
+            {!pending && run.state !== 'ARCHIVED' && canResume ? (
               <Button
                 className="min-h-11"
                 disabled={actionPending}
                 onClick={() =>
-                  command(focusTask.id, () => commands.resume.mutate({ taskId: focusTask.id }))
+                  command('resume', focusTask.id, () =>
+                    commands.resume.mutate({ taskId: focusTask.id }),
+                  )
                 }
               >
                 작업 재개
@@ -308,24 +450,54 @@ export function ProjectRunFocusView({
                   : '선행 조건을 확인한 뒤 다시 시도하세요.'}
               </p>
             ) : null}
-            {!pending && run.state !== 'ARCHIVED' && isCurrent && focusTask.state === 'BLOCKED' ? (
-              <div className="space-y-3">
-                <p className="text-muted-foreground text-sm">
-                  {focusTaskRow?.verificationFailure?.note ??
-                    '막힘 사유를 해결한 뒤 최신 상태에서 재개할 수 있습니다.'}
-                </p>
-                <Button
-                  className="min-h-11"
-                  disabled={actionPending}
-                  onClick={() =>
-                    command(focusTask.id, () => commands.resume.mutate({ taskId: focusTask.id }))
-                  }
-                >
-                  작업 재개
-                </Button>
-              </div>
+            {!pending && run.state !== 'ARCHIVED' && focusTask.state === 'BLOCKED' ? (
+              <p className="text-muted-foreground mt-3 text-sm">
+                {focusTaskRow?.verificationFailure?.note ??
+                  (run.currentTaskId && !isCurrent
+                    ? '다른 현재 작업이 진행 중입니다. 그 작업을 마친 뒤 이 작업을 재개하세요.'
+                    : '막힘 사유를 해결한 뒤 최신 상태에서 재개할 수 있습니다.')}
+              </p>
             ) : null}
           </section>
+          {!pending &&
+          run.state !== 'ARCHIVED' &&
+          isCurrent &&
+          focusTask.state === 'IN_PROGRESS' &&
+          bindingDraft ? (
+            <section className="border-border bg-surface rounded-xl border p-4">
+              <h3 className="text-sm font-bold">현재 작업 AI 도움</h3>
+              <Input
+                className="mt-3"
+                aria-label="현재 작업 AI 질문"
+                value={bindingDraft.aiQuestion}
+                onChange={(event) => setBindingDraft({ aiQuestion: event.target.value })}
+                placeholder="완료 기준을 질문하세요"
+              />
+              <Button
+                className="mt-3 min-h-11"
+                variant="outline"
+                disabled={actionPending}
+                onClick={() =>
+                  command('aiHelp', focusTask.id, () =>
+                    commands.aiHelp.mutate({
+                      taskId: focusTask.id,
+                      question: bindingDraft.aiQuestion.trim() || undefined,
+                    }),
+                  )
+                }
+              >
+                {commands.aiHelp.isPending ? '도움 생성 중' : 'AI 도움 요청'}
+              </Button>
+              {aiHelpResult ? (
+                <div className="mt-4 space-y-2 text-sm">
+                  <p className="leading-6">{aiHelpResult.guidance}</p>
+                  <p className="text-muted-foreground font-mono text-xs break-all">
+                    provenance: {JSON.stringify(aiHelpResult.provenance)}
+                  </p>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
         </section>
       ) : (
         <p className="border-border bg-surface rounded-xl border p-5 text-sm">

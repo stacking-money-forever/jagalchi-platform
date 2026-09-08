@@ -20,8 +20,7 @@ test('seeded user enters a real project run without MSW', async ({ page }) => {
 
   const pageResponse = await page.goto(`/projects/${projectRunId}`);
   expect(pageResponse?.status()).toBe(200);
-  await expect(
-    page.getByRole('heading', { name: `프로젝트 실행 ${projectRunId.slice(0, 8)}` }),
-  ).toBeVisible();
+  await expect(page.getByRole('article', { name: '현재 작업 문서' })).toBeVisible();
+  await expect(page.getByRole('complementary', { name: '프로젝트 여정' })).toBeVisible();
   await expectNoServiceWorker(page);
 });

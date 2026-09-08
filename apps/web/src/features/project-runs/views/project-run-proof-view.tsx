@@ -46,25 +46,45 @@ function PublicationAction({ run }: { run: ProjectRunProjection }) {
 
   if (proof.publication.state === 'ACTIVE') {
     return (
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={commands.unpublish.isPending}
-        onClick={() => commands.unpublish.mutate()}
-      >
-        이 실행의 발행 취소
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={commands.unpublish.isPending || commands.reverify.isPending}
+          onClick={() => commands.unpublish.mutate()}
+        >
+          이 실행의 발행 취소
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={commands.unpublish.isPending || commands.reverify.isPending}
+          onClick={() => commands.reverify.mutate()}
+        >
+          재검증 요청
+        </Button>
+      </div>
     );
   }
   if (proof.verification.state === 'PASS' && proof.publication.state === 'UNPUBLISHED') {
     return (
-      <Button
-        size="sm"
-        disabled={commands.publish.isPending}
-        onClick={() => commands.publish.mutate()}
-      >
-        이 실행 발행 요청
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          disabled={commands.publish.isPending || commands.reverify.isPending}
+          onClick={() => commands.publish.mutate()}
+        >
+          이 실행 발행 요청
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={commands.publish.isPending || commands.reverify.isPending}
+          onClick={() => commands.reverify.mutate()}
+        >
+          재검증 요청
+        </Button>
+      </div>
     );
   }
   if (proof.verification.state === 'FAIL' || proof.verification.state === 'STALE') {

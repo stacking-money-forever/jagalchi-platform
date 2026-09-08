@@ -7,9 +7,10 @@ import {
   ensureSeedSession,
   expectNoServiceWorker,
   focusWorkspaceLocator,
+  openWorkspaceSurface,
   openWaveBTargetEntry,
   proofFactsLocator,
-  selectWorkspaceTab,
+  repositoryBindingRegion,
 } from './helpers';
 
 type FreshTask = {
@@ -42,6 +43,10 @@ type OperationView = {
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 async function projection(page: Page, runId: string): Promise<FreshProjection> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -86,7 +91,7 @@ async function postUiCommand(page: Page, urlPart: string, label: string, expecte
   const responsePromise = page.waitForResponse(
     (response) => response.url().includes(urlPart) && response.request().method() === 'POST',
   );
-  await page.getByRole('button', { name: label, exact: true }).click();
+  await page.getByRole('button', { name: label, exact: true }).filter({ visible: true }).click();
   const response = await responsePromise;
   expect(response.status()).toBe(expectedStatus);
   const body = await response.json();
@@ -104,7 +109,7 @@ async function waitForTaskState(page: Page, runId: string, taskId: string, state
 }
 
 async function graphGeometry(page: Page) {
-  return page.locator('.react-flow__node').evaluateAll((nodes) =>
+  return page.locator('.react-flow__node:visible').evaluateAll((nodes) =>
     nodes
       .map((node) => {
         const rect = node.getBoundingClientRect();
@@ -120,18 +125,20 @@ async function graphGeometry(page: Page) {
 
 async function graphEdges(page: Page) {
   return page
-    .locator('.react-flow__edge')
+    .locator('.react-flow__edge:visible')
     .evaluateAll((edges) => edges.map((edge) => edge.getAttribute('data-id') ?? edge.id).sort());
 }
 
 async function selectExplicitTheme(page: Page, theme: 'light' | 'dark') {
   const expectedName = new RegExp(`^${theme === 'light' ? '라이트' : '다크'} 모드 사용 중`);
   for (let attempt = 0; attempt < 4; attempt += 1) {
-    const selected = page.getByRole('button', { name: expectedName });
+    const selected = page.getByRole('button', { name: expectedName }).filter({ visible: true });
     if (await selected.count()) return;
-    const currentTheme = page.getByRole('button', {
-      name: /^(?:라이트 모드|다크 모드|시스템 설정) 사용 중\./,
-    });
+    const currentTheme = page
+      .getByRole('button', {
+        name: /^(?:라이트 모드|다크 모드|시스템 설정) 사용 중\./,
+      })
+      .filter({ visible: true });
     await expect(currentTheme).toBeVisible({ timeout: 10_000 });
     await currentTheme.click();
   }
@@ -148,10 +155,10 @@ async function captureThemeEvidence(
   await page.goto('/myroadmap');
   await selectExplicitTheme(page, theme);
   await page.goto(`/projects/${runId}`);
-  await selectWorkspaceTab(page, 'Proof');
-  await expect(page.getByRole('note', { name: '검증 출처 안내' })).toContainText(
-    '실제 GitHub 검증 결과가 아닙니다.',
-  );
+  await openWorkspaceSurface(page, 'proof');
+  await expect(
+    page.getByRole('note', { name: 'fixture 한계' }).filter({ visible: true }),
+  ).toContainText('실제 GitHub 검증 또는 공개 증명도 아닙니다.');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     viewport.width,
   );
@@ -177,9 +184,9 @@ async function bindFixturePullRequest(
   repositoryId: string,
   pullRequestNumber: number,
 ) {
-  const bindingRegion = page.getByRole('region', { name: '저장소 바인딩' });
+  const bindingRegion = repositoryBindingRegion(page);
   await expect(bindingRegion).toBeVisible();
-  const repository = bindingRegion.getByLabel('GitHub 저장소');
+  const repository = bindingRegion.getByLabel('GitHub 저장소 ID');
   await expect(repository).toBeVisible();
   await repository.fill(repositoryId);
   const pullNumber = bindingRegion.getByLabel('PR 번호');
@@ -190,7 +197,7 @@ async function bindFixturePullRequest(
       response.url().endsWith(`/api/project-runs/${runId}/pull-request`) &&
       response.request().method() === 'POST',
   );
-  await bindingRegion.getByRole('button', { name: 'PR 바인딩' }).click();
+  await bindingRegion.getByRole('button', { name: '프로젝트 실행 PR 저장' }).click();
   const response = await responsePromise;
   expect(response.status()).toBe(202);
   const body = (await response.json()) as { id?: string; kind?: string };
@@ -256,8 +263,10 @@ test.describe('phase2-closure:complete-journey', () => {
     await test.step('phase2-closure:empty Proof before transition', async () => {
       const run = await projection(page, runId());
       expect(run.proof).toBeNull();
-      await selectWorkspaceTab(page, 'Proof');
-      await expect(page.getByRole('status', { name: 'Proof 미수집' })).toBeVisible();
+      await openWorkspaceSurface(page, 'proof');
+      await expect(
+        page.getByRole('region', { name: 'Proof 결과 없음' }).filter({ visible: true }),
+      ).toBeVisible();
       await expect(proofFactsLocator(page)).toHaveCount(0);
     });
 
@@ -270,7 +279,7 @@ test.describe('phase2-closure:complete-journey', () => {
       taskTitle = task.title;
       initialVersion = run.version;
       await page.goto(`/projects/${runId()}?task=${encodeURIComponent(taskId)}`);
-      await selectWorkspaceTab(page, '포커스');
+      await openWorkspaceSurface(page, 'focus');
       await expect(focusWorkspaceLocator(page)).toBeVisible();
       await expect(
         focusWorkspaceLocator(page).getByRole('heading', {
@@ -282,7 +291,7 @@ test.describe('phase2-closure:complete-journey', () => {
     });
 
     await test.step('phase2-closure:graph-immutable-before-transition', async () => {
-      await selectWorkspaceTab(page, '지도');
+      await openWorkspaceSurface(page, 'map');
       beforeGraph = await graphGeometry(page);
       beforeEdges = await graphEdges(page);
       expect(beforeGraph.length).toBeGreaterThan(0);
@@ -293,7 +302,7 @@ test.describe('phase2-closure:complete-journey', () => {
       const beforeStale = await projection(page, runId());
       expect(beforeStale.tasks.find((task) => task.id === taskId)?.state).toBe('READY');
       expect(beforeStale.version).toBe(initialVersion);
-      await selectWorkspaceTab(page, '포커스');
+      await openWorkspaceSurface(page, 'focus');
       const external = await postBrowserCommand(
         page,
         `/api/project-runs/${runId()}/tasks/${taskId}/start`,
@@ -306,33 +315,37 @@ test.describe('phase2-closure:complete-journey', () => {
           response.url().endsWith(`/api/project-runs/${runId()}/tasks/${taskId}/start`) &&
           response.request().method() === 'POST',
       );
-      await page.getByRole('button', { name: '시작', exact: true }).click();
+      await focusWorkspaceLocator(page)
+        .getByRole('button', { name: '작업 시작', exact: true })
+        .click();
       const conflict = await staleResponse;
       expect(conflict.status()).toBe(409);
       const conflictBody = (await conflict.json()) as { code?: unknown; message?: unknown };
       expect(typeof conflictBody.code).toBe('string');
       expect(typeof conflictBody.message).toBe('string');
-      await expect(page.getByRole('alert').filter({ hasText: '화면의 실행 버전' })).toContainText(
-        /오래되었습니다|다시 받아|재시도/,
-      );
+      await expect(
+        page.getByRole('alert').filter({ hasText: '프로젝트 상태가', visible: true }),
+      ).toContainText(/갱신되었습니다|다시 시도/);
       await waitForTaskState(page, runId(), taskId, 'IN_PROGRESS');
       expect((await projection(page, runId())).version).toBeGreaterThan(initialVersion);
     });
 
     await test.step('phase2-closure:blocked through user-visible command', async () => {
-      await page.getByLabel('막힘 기록 메모').fill('외부 검토가 필요합니다.');
+      await focusWorkspaceLocator(page)
+        .getByRole('textbox', { name: '막힘 기록 메모', exact: true })
+        .fill('외부 검토가 필요합니다.');
       await postUiCommand(page, `/tasks/${taskId}/block`, '막힘 기록', 201);
       await waitForTaskState(page, runId(), taskId, 'BLOCKED');
     });
 
     await test.step('phase2-closure:deterministic-transition resume to IN_PROGRESS', async () => {
-      await postUiCommand(page, `/tasks/${taskId}/resume`, '재개', 201);
+      await postUiCommand(page, `/tasks/${taskId}/resume`, '작업 재개', 201);
       await waitForTaskState(page, runId(), taskId, 'IN_PROGRESS');
     });
     await test.step('phase2-closure:refresh-resume same Focus and state', async () => {
       await page.reload();
       await expect(page).toHaveURL(new RegExp(`[?&]task=${taskId}`));
-      await selectWorkspaceTab(page, '포커스');
+      await openWorkspaceSurface(page, 'focus');
       await expect(
         focusWorkspaceLocator(page).getByRole('heading', {
           name: taskTitle,
@@ -363,7 +376,7 @@ test.describe('phase2-closure:complete-journey', () => {
     });
 
     await test.step('phase2-closure:failure-pr-binding-43', async () => {
-      await selectWorkspaceTab(page, 'Proof');
+      await openWorkspaceSurface(page, 'proof');
       const boundRun = await projection(page, runId());
       const githubRepositoryId = (
         boundRun as FreshProjection & {
@@ -379,9 +392,9 @@ test.describe('phase2-closure:complete-journey', () => {
 
     await test.step('phase2-closure:ai-help-provenance', async () => {
       await page.goto(`/projects/${runId()}?task=${encodeURIComponent(taskId)}`);
-      await selectWorkspaceTab(page, '포커스');
+      await openWorkspaceSurface(page, 'focus');
       const syntheticCanary = process.env.JAGALCHI_E2E_SYNTHETIC_CANARY;
-      await page
+      await focusWorkspaceLocator(page)
         .getByLabel('현재 작업 AI 질문')
         .fill(
           `완료 기준과 검증 근거를 설명해 주세요.${syntheticCanary ? ` ${syntheticCanary}` : ''}`,
@@ -391,17 +404,19 @@ test.describe('phase2-closure:complete-journey', () => {
           response.url().endsWith(`/api/project-runs/${runId()}/tasks/${taskId}/ai-help`) &&
           response.request().method() === 'POST',
       );
-      await page.getByRole('button', { name: 'AI 도움 요청', exact: true }).click();
+      await focusWorkspaceLocator(page)
+        .getByRole('button', { name: 'AI 도움 요청', exact: true })
+        .click();
       const response = await aiResponse;
       expect(response.status()).toBe(200);
       const body = (await response.json()) as { guidance?: unknown; provenance?: unknown };
       expect(typeof body.guidance).toBe('string');
       expect(body.provenance).toBeTruthy();
-      await expect(page.getByText(/^provenance:/)).toBeVisible();
+      await expect(focusWorkspaceLocator(page).getByText(/^provenance:/)).toBeVisible();
     });
 
     await test.step('phase2-closure:verification-failure-visible-and-recoverable', async () => {
-      await postUiCommand(page, `/tasks/${taskId}/verify`, '검증 요청', 202);
+      await postUiCommand(page, `/tasks/${taskId}/verify`, '결과 확인 요청', 202);
       await waitForTaskState(page, runId(), taskId, 'IN_PROGRESS');
       await expect
         .poll(
@@ -412,13 +427,20 @@ test.describe('phase2-closure:complete-journey', () => {
         )
         .toBe('VERIFICATION_FAILED');
       await page.reload();
-      await selectWorkspaceTab(page, '포커스');
-      await expect(page.getByRole('heading', { name: '검증 실패' })).toBeVisible();
-      await expect(page.getByText('VERIFICATION_FAILED')).toBeVisible();
+      await openWorkspaceSurface(page, 'focus');
+      await expect(
+        focusWorkspaceLocator(page).getByRole('heading', { name: '검증 실패' }),
+      ).toBeVisible();
+      await expect(focusWorkspaceLocator(page).getByText('VERIFICATION_FAILED')).toBeVisible();
     });
 
     await test.step('phase2-closure:verification-retry-same-binding-done-proof', async () => {
-      const verifyBody = await postUiCommand(page, `/tasks/${taskId}/verify`, '검증 요청', 202);
+      const verifyBody = await postUiCommand(
+        page,
+        `/tasks/${taskId}/verify`,
+        '결과 확인 요청',
+        202,
+      );
       expect(verifyBody).toBeTruthy();
       await expect
         .poll(
@@ -433,38 +455,53 @@ test.describe('phase2-closure:complete-journey', () => {
       const verified = await projection(page, runId());
       expect(verified.pendingOperation ?? null).toBeNull();
       expect(verified.proof?.verification.state).toBe('PASS');
-      await selectWorkspaceTab(page, 'Proof');
+      await openWorkspaceSurface(page, 'proof');
       await expect(proofFactsLocator(page)).toBeVisible({ timeout: 30_000 });
     });
 
     await test.step('phase2-closure:publish-active', async () => {
-      await postUiCommand(page, `/publish`, '발행', 201);
+      await postUiCommand(page, `/publish`, '이 실행 발행 요청', 201);
       await expect
         .poll(async () => (await projection(page, runId())).proof?.publication.state)
         .toBe('ACTIVE');
-      await expect(page.getByText(/발행됨/)).toBeVisible();
+      await expect(
+        page
+          .getByRole('region', { name: '실행 발행 상태' })
+          .filter({ visible: true })
+          .getByText('발행됨', { exact: true }),
+      ).toBeVisible();
     });
 
     await test.step('phase2-closure:unpublish-owner-control', async () => {
-      await postUiCommand(page, `/unpublish`, '발행 취소', 201);
+      await postUiCommand(page, `/unpublish`, '이 실행의 발행 취소', 201);
       await expect
         .poll(async () => (await projection(page, runId())).proof?.publication.state)
         .toBe('UNPUBLISHED');
-      await expect(page.getByText(/미발행/)).toBeVisible();
-      await postUiCommand(page, `/publish`, '발행', 200);
+      await expect(
+        page
+          .getByRole('region', { name: '실행 발행 상태' })
+          .filter({ visible: true })
+          .getByText('미발행', { exact: true }),
+      ).toBeVisible();
+      await postUiCommand(page, `/publish`, '이 실행 발행 요청', 200);
       await expect
         .poll(async () => (await projection(page, runId())).proof?.publication.state)
         .toBe('ACTIVE');
     });
 
     await test.step('phase2-closure:invalidated-proof after reverify', async () => {
-      await postUiCommand(page, `/reverify`, '재검증', 202);
+      await postUiCommand(page, `/reverify`, '재검증 요청', 202);
       await expect
         .poll(async () => (await projection(page, runId())).proof?.publication.state, {
           timeout: 180_000,
         })
         .toBe('INVALIDATED');
-      await expect(page.getByText(/무효화/)).toBeVisible();
+      await expect(
+        page
+          .getByRole('region', { name: '실행 발행 상태' })
+          .filter({ visible: true })
+          .getByText('무효화', { exact: true }),
+      ).toBeVisible();
     });
 
     await test.step('phase2-closure:light-dark-evidence', async () => {
@@ -483,31 +520,43 @@ test.describe('phase2-closure:complete-journey', () => {
     });
 
     await test.step('phase2-closure:graph-structure-immutability node edge geometry', async () => {
-      await selectWorkspaceTab(page, '지도');
+      await openWorkspaceSurface(page, 'map');
       expect(await graphGeometry(page)).toEqual(beforeGraph);
       expect(await graphEdges(page)).toEqual(beforeEdges);
     });
 
     await test.step('phase2-closure:responsive-1440', async () => {
       await page.setViewportSize({ width: 1440, height: 900 });
-      for (const label of ['지도', '선형', '포커스', 'Proof'] as const) {
-        await selectWorkspaceTab(page, label);
+      for (const surface of ['map', 'journey', 'focus', 'proof'] as const) {
+        await openWorkspaceSurface(page, surface);
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
           1440,
         );
       }
     });
-    await test.step('phase2-closure:narrow-390 responsive tabs', async () => {
+    await test.step('phase2-closure:narrow-390 responsive document journey map proof', async () => {
       await page.setViewportSize({ width: 390, height: 844 });
-      for (const label of ['지도', '선형', '포커스', 'Proof'] as const) {
-        await selectWorkspaceTab(page, label);
+      await openWorkspaceSurface(page, 'journey');
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+        390,
+      );
+      const mapToggle = page
+        .getByRole('button', { name: '여정 지도 펼치기', exact: true })
+        .filter({ visible: true });
+      await expect(mapToggle).toHaveAttribute('aria-expanded', 'false');
+      await openWorkspaceSurface(page, 'map');
+      await expect(
+        page.getByRole('button', { name: '여정 지도 닫기', exact: true }).filter({ visible: true }),
+      ).toHaveAttribute('aria-expanded', 'true');
+      for (const surface of ['focus', 'proof'] as const) {
+        await openWorkspaceSurface(page, surface);
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
           390,
         );
       }
     });
     await test.step('phase2-closure:long-korean-overflow', async () => {
-      await selectWorkspaceTab(page, '지도');
+      await openWorkspaceSurface(page, 'map');
       const dimensions = await page.evaluate(() => ({
         scrollWidth: document.documentElement.scrollWidth,
         clientWidth: document.documentElement.clientWidth,
@@ -515,32 +564,40 @@ test.describe('phase2-closure:complete-journey', () => {
       expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
     });
     await test.step('phase2-closure:keyboard', async () => {
-      await selectWorkspaceTab(page, '선형');
-      await page.getByRole('tab', { name: '지도', exact: true }).focus();
+      await openWorkspaceSurface(page, 'journey');
+      const taskChoice = page
+        .getByRole('complementary', { name: '프로젝트 여정' })
+        .filter({ visible: true })
+        .getByRole('button', { name: new RegExp(`^작업 선택: ${escapeRegExp(taskTitle)}`) });
+      await taskChoice.focus();
       await page.keyboard.press('Enter');
-      await expect(page.getByRole('tab', { name: '지도', exact: true })).toHaveAttribute(
-        'aria-selected',
-        'true',
-      );
+      await expect(taskChoice).toHaveAttribute('aria-pressed', 'true');
+      await expect(
+        focusWorkspaceLocator(page).getByRole('heading', { level: 2, name: taskTitle }),
+      ).toBeVisible();
     });
     await test.step('phase2-closure:reduced-motion', async () => {
       await page.emulateMedia({ reducedMotion: 'reduce' });
-      await selectWorkspaceTab(page, '지도');
-      const moving = await page.locator('[data-exemplar-canvas] *').evaluateAll(
-        (elements) =>
-          elements.filter((element) => {
-            const style = getComputedStyle(element);
-            const transitionProperties = style.transitionProperty
-              .split(',')
-              .map((property) => property.trim());
-            return (
-              style.animationDuration !== '0s' ||
-              transitionProperties.some((property) =>
-                ['transform', 'translate', 'rotate', 'scale'].includes(property),
-              )
-            );
-          }).length,
-      );
+      await openWorkspaceSurface(page, 'map');
+      const moving = await page
+        .getByRole('region', { name: '프로젝트 여정 지도' })
+        .filter({ visible: true })
+        .locator('*:visible')
+        .evaluateAll(
+          (elements) =>
+            elements.filter((element) => {
+              const style = getComputedStyle(element);
+              const transitionProperties = style.transitionProperty
+                .split(',')
+                .map((property) => property.trim());
+              return (
+                style.animationDuration !== '0s' ||
+                transitionProperties.some((property) =>
+                  ['transform', 'translate', 'rotate', 'scale'].includes(property),
+                )
+              );
+            }).length,
+        );
       expect(moving).toBe(0);
     });
     await test.step('phase2-closure:no-service-worker', async () => {

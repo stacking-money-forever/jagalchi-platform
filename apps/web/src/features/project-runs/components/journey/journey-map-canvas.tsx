@@ -179,6 +179,7 @@ export function JourneyMapCanvas({
 
   return (
     <section
+      data-exemplar-canvas
       className="border-border bg-surface flex min-h-[360px] flex-col rounded-xl border"
       aria-label="프로젝트 여정 지도"
     >

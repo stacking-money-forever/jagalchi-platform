@@ -31,4 +31,12 @@ export E2E_BASE_URL="${E2E_BASE_URL:-http://127.0.0.1:$E2E_WEB_PORT}"
 export NEXT_PUBLIC_SITE_URL="$E2E_BASE_URL"
 
 pnpm --dir "$repo_root/apps/web" build
-exec pnpm --dir "$repo_root/apps/web" exec playwright test --config playwright.v1-local.config.ts
+pnpm --dir "$repo_root/apps/web" exec playwright test --config playwright.v1-local.config.ts
+
+rollback_port="${E2E_ROLLBACK_WEB_PORT:-3131}"
+E2E_ROLLBACK_ONLY=true \
+E2E_WEB_PORT="$rollback_port" \
+E2E_BASE_URL="http://127.0.0.1:$rollback_port" \
+NEXT_PUBLIC_EVIDENCE_EXECUTION_ENABLED=false \
+NEXT_PUBLIC_PROJECT_RUNS_ENABLED=false \
+pnpm --dir "$repo_root/apps/web" exec playwright test --config playwright.v1-local.config.ts

@@ -5,6 +5,7 @@ if (!Number.isInteger(webPort) || webPort < 1024 || webPort > 65535) {
   throw new Error('E2E_WEB_PORT must be an integer between 1024 and 65535');
 }
 const baseURL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${webPort}`;
+const rollbackOnly = process.env.E2E_ROLLBACK_ONLY === 'true';
 // Infra browser gate always injects seed env; never attach to an existing dev server.
 const reuseExistingWebServer = !process.env.E2E_SEED_PROJECT_RUN_ID && !process.env.CI;
 
@@ -17,6 +18,8 @@ export default defineConfig({
   workers: 1,
   reporter: 'line',
   use: {
+    actionTimeout: 15_000,
+    navigationTimeout: 30_000,
     baseURL,
     serviceWorkers: 'block',
     trace: 'retain-on-failure',
@@ -34,7 +37,15 @@ export default defineConfig({
       },
       // Product specs use the shared worker-scoped auth handoff fixture.
       dependencies: ['setup-seed-auth'],
-      testIgnore: [/auth\.setup\.ts/, /\.test\.ts$/, /phase-two-fixtures\.ts$/],
+      testMatch: rollbackOnly ? /phase-two-rollback\.spec\.ts$/ : undefined,
+      testIgnore: rollbackOnly
+        ? [/auth\.setup\.ts/, /\.test\.ts$/, /phase-two-fixtures\.ts$/]
+        : [
+            /auth\.setup\.ts/,
+            /\.test\.ts$/,
+            /phase-two-fixtures\.ts$/,
+            /phase-two-rollback\.spec\.ts$/,
+          ],
     },
   ],
   webServer: {

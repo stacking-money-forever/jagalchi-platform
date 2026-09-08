@@ -50,6 +50,8 @@ export type ProjectRunProjectionPayload = {
   tasks: Array<{
     id: string;
     title: string;
+    state: string;
+    required: boolean;
     citationIds?: string[];
     gapIds?: string[];
     evidenceRequirements: string[];
@@ -89,11 +91,16 @@ export async function fetchProjectRun(
 }
 
 export async function expectProjectRunWorkspaceReady(page: Page, projectRunId: string) {
+  await expect(page).toHaveURL(new RegExp(`/projects/${projectRunId}(?:[?#]|$)`));
   await expect(
-    page.getByRole('heading', { name: `프로젝트 실행 ${projectRunId.slice(0, 8)}` }),
+    page.getByRole('main').filter({ visible: true }).getByRole('heading', { level: 1 }).first(),
   ).toBeVisible();
-  await expect(page.getByRole('tablist', { name: '실행 화면' })).toBeVisible();
-  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
+  await expect(focusWorkspaceLocator(page)).toBeVisible();
+  await expect(
+    page.getByRole('complementary', { name: '프로젝트 여정' }).filter({ visible: true }),
+  ).toBeVisible();
+  // Next.js retains the previous route hidden; its pending status is not this route's loader.
+  await expect(page.locator('[aria-busy="true"]:visible')).toHaveCount(0);
 }
 
 export async function openProjectRunWorkspace(page: Page, projectRunId: string) {
@@ -104,35 +111,47 @@ export async function openProjectRunWorkspace(page: Page, projectRunId: string) 
   await expectNoServiceWorker(page);
 }
 
-export async function selectWorkspaceTab(page: Page, label: '지도' | '선형' | '포커스' | 'Proof') {
-  const tab = page.getByRole('tab', { name: label, exact: true });
-  await tab.click();
-  await expect(tab).toHaveAttribute('aria-selected', 'true');
+export type WorkspaceSurface = 'map' | 'journey' | 'focus' | 'proof';
 
-  if (label === '지도') {
-    await expect(page.getByRole('heading', { name: '실행 로드맵 지도' })).toBeVisible();
+export async function openWorkspaceSurface(page: Page, surface: WorkspaceSurface) {
+  if (surface === 'map') {
+    const map = page.getByRole('region', { name: '프로젝트 여정 지도' }).filter({ visible: true });
+    if ((await map.count()) === 0) {
+      await page
+        .getByRole('button', { name: '여정 지도 펼치기', exact: true })
+        .filter({ visible: true })
+        .click();
+    }
+    await expect(map).toBeVisible();
     return;
   }
-  if (label === '선형') {
-    await expect(page.getByRole('heading', { name: '실행 로드맵 선형 보기' })).toBeVisible();
+  if (surface === 'journey') {
+    await expect(
+      page.getByRole('region', { name: '작업 여정' }).filter({ visible: true }),
+    ).toBeVisible();
     return;
   }
-  if (label === '포커스') {
+  if (surface === 'focus') {
     await expect(focusWorkspaceLocator(page)).toBeVisible();
     return;
+  }
+  const disclosure = page.locator('details:visible').filter({
+    has: page.locator('summary', { hasText: '실행 증명과 발행 보기' }),
+  });
+  if (!(await disclosure.evaluate((element) => element.hasAttribute('open')))) {
+    await disclosure.locator('summary').first().click();
   }
   await expect(repositoryBindingRegion(page)).toBeVisible();
 }
 
 export function repositoryBindingRegion(page: Page) {
-  return page.getByRole('region', { name: '저장소 바인딩' });
+  return page
+    .getByRole('region', { name: '프로젝트 실행 PR 바인딩', exact: true })
+    .filter({ visible: true });
 }
 
 export function repositoryBindingValueLocator(page: Page, repositoryName: string) {
-  return repositoryBindingRegion(page)
-    .locator('dt', { hasText: '저장소' })
-    .locator('xpath=following-sibling::dd[1]')
-    .filter({ hasText: repositoryName });
+  return repositoryBindingRegion(page).getByText(repositoryName, { exact: false }).first();
 }
 
 export async function expectRepositoryBindingName(page: Page, repositoryName: string) {
@@ -140,11 +159,19 @@ export async function expectRepositoryBindingName(page: Page, repositoryName: st
 }
 
 export function focusWorkspaceLocator(page: Page) {
-  return page.getByRole('region', { name: '포커스 작업' });
+  return page.getByRole('article', { name: '현재 작업 문서' }).filter({ visible: true });
 }
 
 export function proofFactsLocator(page: Page) {
-  return page.getByRole('region', { name: 'Proof 사실' });
+  return page
+    .getByRole('region', { name: '검증 조건과 출처', exact: true })
+    .filter({ visible: true });
+}
+
+export function proofSummaryLocator(page: Page) {
+  return page
+    .getByRole('region', { name: '실행 결과 요약', exact: true })
+    .filter({ visible: true });
 }
 
 export async function expectFocusCitationLabel(page: Page, label: string) {
@@ -178,23 +205,26 @@ export async function expectProofSurfaceReady(
   await expect(repositoryBindingRegion(page)).toBeVisible();
 
   if (!projection.proof) {
-    await expect(page.getByRole('status', { name: 'Proof 미수집' })).toBeVisible();
+    await expect(
+      page.getByRole('region', { name: 'Proof 결과 없음' }).filter({ visible: true }),
+    ).toBeVisible();
     return;
   }
 
+  await expect(proofSummaryLocator(page)).toBeVisible();
   await expect(proofFactsLocator(page)).toBeVisible();
 }
 
 export function verificationStateLabelKo(state: 'PENDING' | 'PASS' | 'FAIL' | 'STALE'): string {
   switch (state) {
     case 'PASS':
-      return '검증 통과';
+      return '통과';
     case 'PENDING':
-      return '검증 대기';
+      return '대기';
     case 'FAIL':
-      return '검증 실패';
+      return '실패';
     case 'STALE':
-      return '검증 만료';
+      return '만료';
     default:
       return state;
   }
@@ -204,7 +234,9 @@ export async function expectProofVerificationState(
   page: Page,
   state: 'PENDING' | 'PASS' | 'FAIL' | 'STALE',
 ) {
-  await expect(proofFactsLocator(page).getByText(verificationStateLabelKo(state))).toBeVisible();
+  await expect(
+    proofSummaryLocator(page).getByText(verificationStateLabelKo(state), { exact: true }),
+  ).toBeVisible();
 }
 
 export async function expectProofWorkspaceReady(
@@ -216,7 +248,9 @@ export async function expectProofWorkspaceReady(
   if (projection.repositoryBinding?.repositoryName) {
     await expectRepositoryBindingName(page, projection.repositoryBinding.repositoryName);
   } else {
-    await expect(repositoryBindingRegion(page).getByText('바인딩 정보가 없습니다.')).toBeVisible();
+    await expect(
+      repositoryBindingRegion(page).getByText('저장소 바인딩 정보가 없습니다', { exact: false }),
+    ).toBeVisible();
   }
 }
 
@@ -239,7 +273,7 @@ export async function openWaveBTargetEntry(page: Page) {
   await ensureSeedSession(page);
   await page.goto('/projects/new');
   await expectNoServiceWorker(page);
-  await expect(page.getByRole('heading', { name: '목표 공고 → 프로젝트 실행' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '새 프로젝트 시작' })).toBeVisible();
 }
 
 export const WAVE_B_FIXTURE_REPOSITORY_LABEL = 'fixture/verification-repository';
@@ -263,7 +297,7 @@ export async function selectWaveBExistingRepository(
   await repoSelect.selectOption({ label: repositoryLabel });
   await expect(repoSelect).toHaveValue(repositoryId!);
 
-  const continueButton = page.getByRole('button', { name: '범위 확인으로 계속' });
+  const continueButton = page.getByRole('button', { name: '시작 내용 확인' });
   await expect(continueButton).toBeEnabled();
   await continueButton.click();
   return repositoryId!;
@@ -275,15 +309,15 @@ export async function completeWaveBWizardFromProfileReview(
 ) {
   await ensureSeedSession(page);
   await expect(page.getByRole('heading', { name: '로그인이 필요합니다' })).not.toBeVisible();
-  await expect(page.getByRole('heading', { name: 'GitHub 증거 스냅샷 검토' })).toBeVisible({
+  await expect(page.getByRole('heading', { name: '가져온 작업 정보 확인' })).toBeVisible({
     timeout: 180_000,
   });
-  await page.getByRole('button', { name: '증거 스냅샷 확인' }).click();
+  await page.getByRole('button', { name: '이 내용으로 계속' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Career Diff 검토' })).toBeVisible({
+  await expect(page.getByRole('heading', { name: '준비 상태 확인' })).toBeVisible({
     timeout: 120_000,
   });
-  await page.getByRole('button', { name: 'Career Diff 확인' }).click();
+  await page.getByRole('button', { name: '이 내용으로 계속' }).click();
 
   await expect(page.getByRole('button', { name: '이 제안 선택' }).first()).toBeVisible({
     timeout: 180_000,
@@ -293,20 +327,20 @@ export async function completeWaveBWizardFromProfileReview(
 
   const repositoryId = await selectWaveBExistingRepository(page);
 
-  await expect(page.getByRole('heading', { name: '범위 및 비목표 확인' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '시작 내용 확인' })).toBeVisible();
   const projectRunResponse = page.waitForResponse(
     (response) =>
       response.url().endsWith('/api/project-run-operations') &&
       response.request().method() === 'POST',
   );
-  await page.getByRole('button', { name: '프로젝트 실행 만들기' }).click();
+  await page.getByRole('button', { name: '프로젝트 시작' }).click();
   if (options.observeProjectRunLoading) {
     await expect(page.locator('[aria-busy="true"]')).toBeVisible();
   }
   const response = await projectRunResponse;
   expect(response.status()).toBe(202);
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/i, { timeout: 180_000 });
-  await expect(page.getByRole('tab', { name: '지도' })).toBeVisible();
+  await expectProjectRunWorkspaceReady(page, new URL(page.url()).pathname.split('/').at(-1)!);
   await expectNoServiceWorker(page);
   return { repositoryId, operation: await response.json() };
 }
