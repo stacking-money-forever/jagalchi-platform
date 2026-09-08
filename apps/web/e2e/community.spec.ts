@@ -36,7 +36,7 @@ test.describe('Community E2E', () => {
       await expect(page).toHaveURL(new RegExp(`/viewer/${FRONTEND_ROADMAP_ID}$`), {
         timeout: 30000,
       });
-      await expect(page.locator('.react-flow')).toBeVisible({ timeout: 30000 });
+      await expect(page.locator('.react-flow:visible')).toBeVisible({ timeout: 30000 });
     });
 
     test('searches latest roadmaps and forks a result', async ({ page }) => {
@@ -65,7 +65,7 @@ test.describe('Community E2E', () => {
       await expect(page).toHaveURL(new RegExp(`/viewer/${FRONTEND_ROADMAP_ID}$`), {
         timeout: 30000,
       });
-      await expect(page.locator('.react-flow')).toBeVisible({ timeout: 30000 });
+      await expect(page.locator('.react-flow:visible')).toBeVisible({ timeout: 30000 });
     });
 
     test('renders roadmap title and viewer actions', async ({ page }) => {
@@ -77,7 +77,7 @@ test.describe('Community E2E', () => {
     test('fork action opens an editable copy', async ({ page }) => {
       await page.getByRole('button', { name: '내 과제로 복사', exact: true }).click();
       await expect(page).toHaveURL(/\/editor\/[0-9a-f-]{36}$/, { timeout: 30000 });
-      await expect(page.locator('.react-flow')).toBeVisible({ timeout: 30000 });
+      await expect(page.locator('.react-flow:visible')).toBeVisible({ timeout: 30000 });
     });
 
     test('back button is available', async ({ page }) => {

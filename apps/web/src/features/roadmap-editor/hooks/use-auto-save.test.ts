@@ -66,6 +66,31 @@ describe('useAutoSave', () => {
     expect(api.updateEditableRoadmap).not.toHaveBeenCalled();
   });
 
+  it('saves an edit made before the loaded baseline finishes debouncing', async () => {
+    vi.useFakeTimers();
+    const staleNodes = [makeNode('stale-node', 'Stale')];
+    const loadedNodes = [makeNode('loaded-node', 'Loaded')];
+    const editedNodes = [makeNode('loaded-node', 'Edited immediately')];
+
+    const { rerender } = renderHook(
+      ({ nodes, enabled }) =>
+        useAutoSave({ roadmapId, nodes, edges: [], title: 'Test', isEnabled: enabled }),
+      { initialProps: { nodes: staleNodes, enabled: false } },
+    );
+
+    rerender({ nodes: loadedNodes, enabled: true });
+    rerender({ nodes: editedNodes, enabled: true });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+
+    expect(api.updateEditableRoadmap).toHaveBeenCalledWith(roadmapId, {
+      title: 'Test',
+      graph: { schemaVersion: 1, nodes: editedNodes, edges: [] },
+    });
+  });
+
   it('baselines loaded values before first enable and saves a later real edit', async () => {
     vi.useFakeTimers();
     const staleNodes = [makeNode('stale-node', 'Jagalchi Local Execution Roadmap')];

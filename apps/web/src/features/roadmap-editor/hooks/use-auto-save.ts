@@ -33,6 +33,7 @@ export function useAutoSave({
   const activeRoadmapIdRef = useRef<string | null>(null);
   const wasEnabledRef = useRef(false);
   const pendingBaselineRef = useRef(false);
+  const observedStaleBaselineRef = useRef(false);
   const saveSessionRef = useRef(0);
   const debouncedValues = useDebounce(
     useMemo(() => ({ nodes, edges, title }), [nodes, edges, title]),
@@ -49,6 +50,7 @@ export function useAutoSave({
       activeRoadmapIdRef.current = null;
       wasEnabledRef.current = false;
       pendingBaselineRef.current = false;
+      observedStaleBaselineRef.current = false;
       return;
     }
 
@@ -59,6 +61,7 @@ export function useAutoSave({
       if (wasEnabledRef.current) saveSessionRef.current += 1;
       wasEnabledRef.current = false;
       pendingBaselineRef.current = false;
+      observedStaleBaselineRef.current = false;
       return;
     }
 
@@ -68,6 +71,7 @@ export function useAutoSave({
       prevEdgesRef.current = hashEdges(edges);
       prevTitleRef.current = title;
       pendingBaselineRef.current = true;
+      observedStaleBaselineRef.current = false;
       wasEnabledRef.current = false;
       return;
     }
@@ -78,6 +82,7 @@ export function useAutoSave({
         prevEdgesRef.current = hashEdges(edges);
         prevTitleRef.current = title;
         pendingBaselineRef.current = true;
+        observedStaleBaselineRef.current = false;
         wasEnabledRef.current = true;
         return;
       }
@@ -99,9 +104,16 @@ export function useAutoSave({
         currentTitle === prevTitleRef.current
       ) {
         pendingBaselineRef.current = false;
+        observedStaleBaselineRef.current = false;
         wasEnabledRef.current = true;
+        return;
       }
-      return;
+      if (!observedStaleBaselineRef.current) {
+        observedStaleBaselineRef.current = true;
+        return;
+      }
+      pendingBaselineRef.current = false;
+      observedStaleBaselineRef.current = false;
     }
 
     const nodesChanged = currentNodesHash !== prevNodesRef.current;

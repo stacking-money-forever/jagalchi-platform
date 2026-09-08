@@ -34,13 +34,18 @@ test.describe('Protected routes', () => {
 
     // 2. 보호 라우트 진입 확인
     await page.goto('/myroadmap');
-    await expect(page.getByRole('heading', { name: '내 실행 과제' })).toBeVisible({
+    await expect(page.getByRole('heading', { name: '지금 이어갈 프로젝트' })).toBeVisible({
       timeout: 30000,
     });
 
     // 3. 로그아웃
+    await page.goto('/library');
     await page.getByRole('button', { name: '로그아웃' }).click();
-    await expect(page).toHaveURL(/\/login/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/$/, { timeout: 10000 });
+
+    // MSW cannot clear the HttpOnly session hint installed by the E2E login
+    // helper. The BFF cookie-clearing contract is covered by server tests.
+    await page.context().clearCookies();
 
     // 4. 로그아웃 후 보호 라우트 접근 시 다시 /login 으로 리다이렉트
     await page.goto('/myroadmap');

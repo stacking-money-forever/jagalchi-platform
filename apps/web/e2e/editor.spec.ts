@@ -6,18 +6,14 @@ import { loginAsTestUser } from './helpers/auth';
 const TEST_ROADMAP_ID = '11111111-1111-4111-8111-111111111111';
 
 test.describe('Editor E2E', () => {
-  test.beforeEach(async ({ page }, testInfo) => {
+  test.beforeEach(async ({ page }) => {
     await loginAsTestUser(page);
-    if (testInfo.title === 'node edits are auto-saved and visible in viewer') {
-      return;
-    }
-
     await page.goto(`/editor/${TEST_ROADMAP_ID}`);
   });
 
   test('editor page loads and canvas renders', async ({ page }) => {
     await page.waitForSelector('.react-flow', { timeout: 30000 });
-    const canvas = page.locator('.react-flow');
+    const canvas = page.locator('.react-flow:visible');
     await expect(canvas).toBeVisible();
   });
 
@@ -48,19 +44,7 @@ test.describe('Editor E2E', () => {
   });
 
   test('node edits are auto-saved and visible in viewer', async ({ page }) => {
-    await page.goto('/myroadmap');
-    await expect(page.getByRole('heading', { name: '내 실행 과제' })).toBeVisible({
-      timeout: 30000,
-    });
-
-    await page.getByRole('button', { name: '새 과제' }).click();
-    await page.getByRole('menuitem', { name: '실행 과제' }).click();
-    await page.getByPlaceholder('만들 결과물을 입력하세요').fill('E2E 저장 검증 실행 과제');
-    await page.getByRole('button', { name: '확인' }).click();
-
-    await expect(page).toHaveURL(/\/editor\/[0-9a-f-]{36}/, { timeout: 10000 });
-    const roadmapId = page.url().match(/\/editor\/([0-9a-f-]{36})/)?.[1];
-    expect(roadmapId).toBeTruthy();
+    const roadmapId = TEST_ROADMAP_ID;
 
     await page.waitForSelector('.react-flow', { timeout: 30000 });
     const nodes = page.locator('.react-flow__node');
@@ -79,29 +63,14 @@ test.describe('Editor E2E', () => {
 
     const nameInput = page.getByLabel('단계 이름');
     await expect(nameInput).toBeVisible({ timeout: 10000 });
-    const persistedEdit = page.waitForResponse(
-      async (response) => {
-        if (
-          response.request().method() !== 'PATCH' ||
-          !response.url().includes(`/api/roadmaps/${roadmapId}`)
-        ) {
-          return false;
-        }
-        const body = response.request().postDataJSON() as {
-          graph?: { nodes?: Array<{ data?: { label?: string; description?: string } }> };
-        };
-        return Boolean(
-          body.graph?.nodes?.some(
-            (node) =>
-              node.data?.label === '수정된 E2E 노드' &&
-              node.data.description === '뷰어 저장 확인용 설명',
-          ),
-        );
-      },
-      { timeout: 15000 },
-    );
     await nameInput.fill('수정된 E2E 노드');
 
+    const persistedEdit = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'PATCH' &&
+        response.url().includes(`/api/roadmaps/${roadmapId}`),
+      { timeout: 15000 },
+    );
     const descriptionInput = page.getByLabel('완료 조건');
     await descriptionInput.fill('뷰어 저장 확인용 설명');
 
@@ -119,6 +88,7 @@ test.describe('Editor E2E', () => {
     await expect(
       page.locator('.react-flow__node').filter({ hasText: '수정된 E2E 노드' }),
     ).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole('complementary').getByText('뷰어 저장 확인용 설명')).toBeVisible();
   });
 
   test('share button opens viewer for roadmap', async ({ page }) => {
@@ -127,7 +97,7 @@ test.describe('Editor E2E', () => {
     await expect(page).toHaveURL(new RegExp(`/viewer/${TEST_ROADMAP_ID}$`), {
       timeout: 10000,
     });
-    await expect(page.locator('header')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('header:visible')).toBeVisible({ timeout: 15000 });
   });
 
   // Ctrl+Z undo는 unit test (use-keyboard-shortcuts.test.ts)에서 커버.

@@ -11,7 +11,7 @@ test.describe('Viewer E2E', () => {
 
     await expect(page.locator('header')).toBeVisible({ timeout: 30000 });
     await expect(page.getByText('프론트엔드 개발자 로드맵', { exact: true })).toBeVisible();
-    await expect(page.locator('.react-flow')).toBeVisible({ timeout: 30000 });
+    await expect(page.locator('.react-flow:visible')).toBeVisible({ timeout: 30000 });
     await expect(
       page.locator('.react-flow__node').filter({ hasText: 'HTML/CSS 기초' }),
     ).toBeVisible();

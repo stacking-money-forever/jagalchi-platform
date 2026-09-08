@@ -260,7 +260,9 @@ test.describe('Auth E2E', () => {
       await registerLink.click();
 
       await expect(page).toHaveURL(/\/register/);
-      await expect(page.getByText('회원가입', { exact: true })).toBeVisible();
+      await expect(
+        page.locator('[data-slot="card-title"]').filter({ hasText: /^회원가입$/ }),
+      ).toBeVisible();
     });
 
     test('login → find-password link navigates correctly', async ({ page }) => {

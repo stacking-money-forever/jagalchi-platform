@@ -61,6 +61,7 @@ jobs:
       - run: pnpm --filter @jagalchi/web exec playwright install --with-deps chromium
       - run: pnpm --filter @jagalchi/web build
         env:
+          E2E_STATIC_BUILD: "true"
           NEXT_PUBLIC_API_URL: /api
           NEXT_PUBLIC_API_MOCKING: "true"
           NEXT_PUBLIC_E2E_MOCKING: "true"
@@ -68,6 +69,7 @@ jobs:
           NEXT_PUBLIC_REALTIME_URL: https://api.example.com
           NEXT_PUBLIC_EVIDENCE_EXECUTION_ENABLED: "true"
           NEXT_PUBLIC_PROOF_PROFILE_ENABLED: "true"
+          NEXT_PUBLIC_PROJECT_RUNS_ENABLED: "true"
           NEXT_PUBLIC_SITE_URL: http://localhost:3100
       - run: pnpm --filter @jagalchi/web test:e2e
         env:
@@ -79,3 +81,4 @@ jobs:
           NEXT_PUBLIC_REALTIME_URL: https://api.example.com
           NEXT_PUBLIC_EVIDENCE_EXECUTION_ENABLED: "true"
           NEXT_PUBLIC_PROOF_PROFILE_ENABLED: "true"
+          NEXT_PUBLIC_PROJECT_RUNS_ENABLED: "true"

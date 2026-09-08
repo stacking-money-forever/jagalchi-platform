@@ -13,4 +13,15 @@ export async function loginAsTestUser(page: Page) {
   await page.getByPlaceholder('비밀번호 입력').fill(TEST_PASSWORD);
   await page.getByRole('button', { name: '로그인', exact: true }).click();
   await page.waitForURL(/\/(myroadmap)?$/, { timeout: 15000 });
+  // Browser-side MSW can mock the login body, but it cannot reproduce the
+  // HttpOnly session hint normally set by the BFF response. Keep protected
+  // route navigation faithful to the authenticated mock state.
+  await page.context().addCookies([
+    {
+      name: 'jagalchi-session',
+      value: '1',
+      url: new URL(page.url()).origin,
+      sameSite: 'Lax',
+    },
+  ]);
 }

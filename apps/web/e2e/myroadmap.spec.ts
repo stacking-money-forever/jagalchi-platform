@@ -1,221 +1,41 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { loginAsTestUser } from './helpers/auth';
 
-test.describe('My Roadmaps E2E', () => {
+test.describe('My Projects E2E', () => {
   test.beforeEach(async ({ page }) => {
     await loginAsTestUser(page);
     await page.goto('/myroadmap');
-    await expect(page.getByRole('heading', { name: '내 실행 과제' })).toBeVisible({
-      timeout: 30000,
+    await expect(page.getByRole('heading', { name: '지금 이어갈 프로젝트' })).toBeVisible({
+      timeout: 15_000,
     });
   });
 
-  test.describe('Page Layout', () => {
-    test('renders header with title', async ({ page }) => {
-      const heading = page.getByRole('heading', { name: '내 실행 과제' });
-      await expect(heading).toBeVisible();
-    });
+  test('presents the project workspace and its primary action', async ({ page }) => {
+    const workspace = page.getByRole('region', { name: '지금 이어갈 프로젝트' });
 
-    test('renders sidebar with navigation items', async ({ page }) => {
-      await expect(page.getByRole('button', { name: '최근 실행' })).toBeVisible();
-      await expect(page.getByRole('button', { name: '내 실행 과제' })).toBeVisible();
-      await expect(page.getByRole('button', { name: '공유받은 과제' })).toBeVisible();
-      await expect(page.getByRole('button', { name: '즐겨찾기' })).toBeVisible();
-    });
-
-    test('renders toolbar with search, filter, and new button', async ({ page }) => {
-      await expect(page.getByPlaceholder('실행 과제 검색')).toBeVisible();
-      await expect(page.getByLabel('실행 과제 필터')).toBeVisible();
-      await expect(page.getByRole('button', { name: '새 과제' })).toBeVisible();
-    });
-
-    test('renders sidebar profile info', async ({ page }) => {
-      await expect(page.getByRole('button', { name: '프로필 보기' })).toBeVisible();
-      await expect(page.getByPlaceholder('과제·폴더 검색')).toBeVisible();
-    });
+    await expect(workspace.getByText('내 프로젝트', { exact: true })).toBeVisible();
+    await expect(workspace.getByRole('link', { name: '프로젝트 만들기' })).toHaveAttribute(
+      'href',
+      '/projects/new',
+    );
+    await expect(page.getByRole('heading', { name: '프로젝트 실행' })).toBeVisible();
   });
 
-  test.describe('Sidebar Navigation', () => {
-    test('clicking sidebar category updates active state', async ({ page }) => {
-      const sharedButton = page.getByRole('button', { name: '공유받은 과제' });
-      await sharedButton.click();
-      await expect(sharedButton).toHaveAttribute('aria-pressed', 'true');
-    });
+  test('opens the new-project flow from the primary action', async ({ page }) => {
+    await page
+      .getByRole('region', { name: '지금 이어갈 프로젝트' })
+      .getByRole('link', { name: '프로젝트 만들기' })
+      .click();
 
-    test('logout button is visible and clickable', async ({ page }) => {
-      const logoutButton = page.getByRole('button', { name: '로그아웃' });
-      await expect(logoutButton).toBeVisible();
-    });
-
-    test('clicking sidebar profile opens profile page', async ({ page }) => {
-      await page.getByRole('button', { name: '프로필 보기' }).click();
-      await expect(page).toHaveURL(/\/profile/, { timeout: 10000 });
-    });
+    await expect(page).toHaveURL(/\/projects\/new$/);
+    await expect(page.getByRole('main')).toBeVisible();
   });
 
-  test.describe('Toolbar', () => {
-    test('shows all execution tasks as default breadcrumb', async ({ page }) => {
-      await expect(page.getByText('전체 실행 과제')).toBeVisible();
-    });
-
-    test('New dropdown shows roadmap and directory options', async ({ page }) => {
-      await page.getByRole('button', { name: '새 과제' }).click();
-      await expect(page.getByRole('menuitem', { name: '실행 과제' })).toBeVisible();
-      await expect(page.getByRole('menuitem', { name: '과제 폴더' })).toBeVisible();
-    });
-
-    test('clicking "로드맵" opens AddRoadmapModal', async ({ page }) => {
-      await page.getByRole('button', { name: '새 과제' }).click();
-      await page.getByRole('menuitem', { name: '실행 과제' }).click();
-      await expect(page.getByText('실행 과제 추가')).toBeVisible({ timeout: 5000 });
-      await expect(page.getByPlaceholder('만들 결과물을 입력하세요')).toBeVisible();
-    });
-
-    test('creating a roadmap opens the editor canvas', async ({ page }) => {
-      await page.getByRole('button', { name: '새 과제' }).click();
-      await page.getByRole('menuitem', { name: '실행 과제' }).click();
-      await page.getByPlaceholder('만들 결과물을 입력하세요').fill('E2E 생성 실행 과제');
-      await page.getByRole('button', { name: '확인' }).click();
-
-      await expect(page).toHaveURL(/\/editor\/[0-9a-f-]{36}/, { timeout: 10000 });
-      await expect(page.getByText('E2E 생성 실행 과제')).toBeVisible({ timeout: 10000 });
-      await expect(page.locator('.react-flow')).toBeVisible({ timeout: 30000 });
-    });
-
-    test('search filters matching roadmaps', async ({ page }) => {
-      await page.getByPlaceholder('실행 과제 검색').fill('프론트엔드');
-
-      await expect(page.getByRole('article', { name: '프론트엔드 개발자 로드맵' })).toBeVisible({
-        timeout: 10000,
-      });
-      await expect(page.getByRole('article', { name: '백엔드 개발자 로드맵' })).toHaveCount(0);
-    });
-  });
-
-  test.describe('Roadmap Card Actions', () => {
-    test('roadmap cards are displayed in grid', async ({ page }) => {
-      const cards = page.locator('[role="article"]');
-      await expect(cards.first()).toBeVisible({ timeout: 10000 });
-      const count = await cards.count();
-      expect(count).toBeGreaterThan(0);
-    });
-
-    test('clicking a roadmap card opens the editor', async ({ page }) => {
-      await page.getByRole('article', { name: '프론트엔드 개발자 로드맵' }).click();
-
-      await expect(page).toHaveURL(/\/editor\/11111111-1111-4111-8111-111111111111/, {
-        timeout: 10000,
-      });
-      await expect(page.locator('.react-flow')).toBeVisible({ timeout: 30000 });
-    });
-
-    test('card more menu shows action options', async ({ page }) => {
-      const cards = page.locator('[role="article"]');
-      await expect(cards.first()).toBeVisible({ timeout: 10000 });
-
-      const moreButton = cards.first().getByLabel('더 보기');
-      await moreButton.click();
-
-      await expect(page.getByRole('menuitem', { name: '즐겨찾기' })).toBeVisible();
-      await expect(page.getByRole('menuitem', { name: '이름수정' })).toBeVisible();
-      await expect(page.getByRole('menuitem', { name: '파일이동' })).toBeVisible();
-      await expect(page.getByRole('menuitem', { name: '삭제' })).toBeVisible();
-    });
-
-    test('card rename opens dialog', async ({ page }) => {
-      const cards = page.locator('[role="article"]');
-      await expect(cards.first()).toBeVisible({ timeout: 10000 });
-
-      await cards.first().getByLabel('더 보기').click();
-      await page.getByRole('menuitem', { name: '이름수정' }).click();
-
-      await expect(page.getByText('이름 수정')).toBeVisible({ timeout: 5000 });
-      await expect(page.getByPlaceholder('새 이름을 입력하세요')).toBeVisible();
-    });
-
-    test('card delete opens confirmation dialog', async ({ page }) => {
-      const cards = page.locator('[role="article"]');
-      await expect(cards.first()).toBeVisible({ timeout: 10000 });
-
-      await cards.first().getByLabel('더 보기').click();
-      await page.getByRole('menuitem', { name: '삭제' }).click();
-
-      await expect(page.getByText('정말 삭제하시겠습니까?')).toBeVisible({ timeout: 5000 });
-      await expect(page.getByText('이 작업은 되돌릴 수 없습니다.')).toBeVisible();
-    });
-  });
-
-  test.describe('Directory Tree', () => {
-    test('directory tree is rendered in sidebar', async ({ page }) => {
-      await expect(page.getByText('프론트엔드', { exact: true })).toBeVisible({ timeout: 10000 });
-      await expect(page.getByText('백엔드', { exact: true })).toBeVisible();
-    });
-
-    test('directory has context menu with rename and delete', async ({ page }) => {
-      await expect(page.getByText('프론트엔드', { exact: true })).toBeVisible({ timeout: 10000 });
-      await page.getByLabel('프론트엔드 더보기').click();
-      await expect(page.getByRole('menuitem', { name: '이름 변경' })).toBeVisible();
-      await expect(page.getByRole('menuitem', { name: '삭제' })).toBeVisible();
-    });
-  });
-
-  test.describe('Edge Cases', () => {
-    test('search with no results shows empty grid', async ({ page }) => {
-      const searchInput = page.getByPlaceholder('실행 과제 검색');
-      await searchInput.fill('존재하지않는로드맵이름xyz');
-
-      const cards = page.locator('[role="article"]');
-      await expect(cards).toHaveCount(0);
-      await expect(page.getByText('검색 결과가 없습니다')).toBeVisible();
-    });
-
-    test('rename dialog confirm button disabled with empty input', async ({ page }) => {
-      const cards = page.locator('[role="article"]');
-      await expect(cards.first()).toBeVisible({ timeout: 10000 });
-
-      await cards.first().getByLabel('더 보기').click();
-      await page.getByRole('menuitem', { name: '이름수정' }).click();
-
-      await expect(page.getByText('이름 수정')).toBeVisible({ timeout: 5000 });
-      const renameInput = page.getByPlaceholder('새 이름을 입력하세요');
-      await renameInput.clear();
-
-      const confirmButton = page.getByRole('button', { name: '확인' });
-      await expect(confirmButton).toBeDisabled();
-    });
-
-    test('delete dialog cancel closes without deleting', async ({ page }) => {
-      const cards = page.locator('[role="article"]');
-      await expect(cards.first()).toBeVisible({ timeout: 10000 });
-      const initialCount = await cards.count();
-
-      await cards.first().getByLabel('더 보기').click();
-      await page.getByRole('menuitem', { name: '삭제' }).click();
-
-      await expect(page.getByText('정말 삭제하시겠습니까?')).toBeVisible({ timeout: 5000 });
-      await page.getByRole('button', { name: '취소' }).click();
-
-      // Dialog closed, cards still there
-      await expect(page.getByText('정말 삭제하시겠습니까?')).not.toBeVisible();
-      await expect(cards).toHaveCount(initialCount);
-    });
-
-    test('sidebar category switching resets active state', async ({ page }) => {
-      const recentButton = page.getByRole('button', { name: '최근 실행' });
-      const sharedButton = page.getByRole('button', { name: '공유받은 과제' });
-
-      await sharedButton.click();
-      await expect(sharedButton).toHaveAttribute('aria-pressed', 'true');
-
-      await recentButton.click();
-      await expect(recentButton).toHaveAttribute('aria-pressed', 'true');
-      await expect(sharedButton).toHaveAttribute('aria-pressed', 'false');
-    });
-
-    test('logout redirects to login page', async ({ page }) => {
-      await page.getByRole('button', { name: '로그아웃' }).click();
-      await expect(page).toHaveURL(/\/login/, { timeout: 10000 });
-    });
+  test('keeps the saved-roadmap library available in global navigation', async ({ page }) => {
+    await expect(page.getByRole('link', { name: '라이브러리' })).toHaveAttribute(
+      'href',
+      '/library',
+    );
   });
 });

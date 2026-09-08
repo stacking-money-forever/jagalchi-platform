@@ -2,7 +2,16 @@
 
 import { useState } from 'react';
 
-import { CheckCircle2, ExternalLink, RotateCcw, ShieldCheck, XCircle } from 'lucide-react';
+import Link from 'next/link';
+
+import {
+  ArrowLeft,
+  CheckCircle2,
+  ExternalLink,
+  RotateCcw,
+  ShieldCheck,
+  XCircle,
+} from 'lucide-react';
 
 import { AppShell } from '@/components/app-shell/app-shell';
 import { Button } from '@/components/ui/button';
@@ -93,6 +102,12 @@ export function CareerReviewQueue() {
     <AppShell activeTab="career">
       <div className="mx-auto w-full max-w-4xl">
         <header>
+          <Button asChild variant="ghost" size="sm" className="mb-4 -ml-3">
+            <Link href="/career">
+              <ArrowLeft aria-hidden="true" />
+              Career Diff로 돌아가기
+            </Link>
+          </Button>
           <p className="text-primary text-xs font-extrabold">REVIEWER WORKSPACE</p>
           <h1 className="mt-2 text-2xl font-extrabold tracking-tight sm:text-3xl">
             결과물 검증 대기열
