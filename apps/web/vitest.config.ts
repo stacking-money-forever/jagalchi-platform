@@ -35,12 +35,12 @@ export default defineConfig({
           browser: {
             enabled: true,
             headless: true,
-            provider: playwright({}),
+            // pnpm may materialize Vitest's peer graph under distinct hashes even at the same
+            // version; the provider runtime contract remains the one consumed by this config.
+            provider: playwright({}) as never,
             instances: [{ browser: 'chromium' }],
           },
           pool: 'forks',
-          // @ts-expect-error -- vitest browser project에서 poolOptions 타입 미지원
-          poolOptions: { forks: { maxForks: 2 } },
           setupFiles: ['.storybook/vitest.setup.ts'],
         },
       },
