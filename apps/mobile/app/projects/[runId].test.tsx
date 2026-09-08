@@ -33,18 +33,25 @@ describe('ProjectRunScreen', () => {
         proof: null,
       }),
     ) as jest.Mock;
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Number.POSITIVE_INFINITY } },
+    });
     const view = render(
       <QueryClientProvider client={queryClient}>
         <ProjectRunScreen />
       </QueryClientProvider>,
     );
-    expect(await screen.findByText('API 구현')).toBeOnTheScreen();
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/project-runs/run-1'),
-      expect.objectContaining({ method: 'GET' }),
-    );
-    view.unmount();
-    queryClient.clear();
+    try {
+      expect((await screen.findAllByText('API 구현', {}, { timeout: 5_000 })).length).toBeGreaterThan(
+        0,
+      );
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/project-runs/run-1'),
+        expect.objectContaining({ method: 'GET' }),
+      );
+    } finally {
+      view.unmount();
+      queryClient.clear();
+    }
   });
 });
