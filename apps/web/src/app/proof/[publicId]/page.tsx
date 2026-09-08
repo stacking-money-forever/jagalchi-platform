@@ -49,7 +49,7 @@ async function loadOrNotFound(publicId: string) {
 }
 
 export async function generateMetadata({ params }: ProofProfilePageProps): Promise<Metadata> {
-  if (!isEnabled('PROOF_PROFILE_ENABLED')) {
+  if (!isEnabled('PROOF_PROFILE_ENABLED') || process.env.NEXT_PUBLIC_E2E_MOCKING === 'true') {
     return {
       title: 'Proof Profile',
       description: '검증된 실행 증거를 확인하세요.',
