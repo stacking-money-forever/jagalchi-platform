@@ -55,6 +55,10 @@ visual-tests/
 
 # screenshots (temp)
 *.png
+!public/pwa-icon-192.png
+!public/pwa-icon-512.png
+!public/pwa-icon-maskable-512.png
+!public/apple-touch-icon.png
 
 # Playwright
 /test-results/
