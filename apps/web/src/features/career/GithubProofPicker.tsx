@@ -176,9 +176,22 @@ export function GithubProofPicker({
               {submitError}
             </p>
           ) : null}
-          <Button className="mt-5 w-full sm:w-auto" type="submit" loading={isBinding}>
-            이 PR 연결하기
-          </Button>
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+            <Button className="w-full sm:w-auto" type="submit" loading={isBinding}>
+              이 PR 연결하기
+            </Button>
+            <Button
+              className="w-full sm:w-auto"
+              type="button"
+              variant="outline"
+              onClick={onConnect}
+            >
+              <RefreshCw aria-hidden="true" /> GitHub App 다시 연결
+            </Button>
+          </div>
+          <p className="text-muted-foreground mt-3 text-xs leading-5">
+            App이 교체됐거나 연결이 만료된 경우 다시 연결해 최신 설치 권한을 확인합니다.
+          </p>
         </form>
       )}
     </section>
