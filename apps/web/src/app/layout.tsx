@@ -33,9 +33,19 @@ export const metadata: Metadata = {
   description:
     '목표 직무의 요구 역량과 GitHub·배포·기술 문서를 연결해 부족한 커리어 증거를 확인하고 검증합니다.',
   icons: {
-    icon: '/jagalchi.svg',
+    icon: [
+      { url: '/jagalchi.svg', type: 'image/svg+xml' },
+      { url: '/pwa-icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/pwa-icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
   },
   manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: '자갈치',
+  },
   openGraph: {
     title: '자갈치, 증거로 준비하는 개발자 커리어',
     description: '채용공고의 요구 역량과 실제 결과물 사이의 차이를 확인하고 검증합니다.',
