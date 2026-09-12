@@ -78,13 +78,11 @@ const CRITERION_TYPES = new Set<PublicProofCriterionType>([
   'HUMAN_CHECK',
 ]);
 
-const publicApiOrigin = (() => {
+const publicApiBase = (() => {
   const configuredPublicUrl = process.env.NEXT_PUBLIC_API_URL;
-  const origin =
-    process.env.API_ORIGIN ??
-    (configuredPublicUrl?.startsWith('http') ? configuredPublicUrl : undefined) ??
-    'https://jagalchi-api.justn.me';
-  return origin.replace(/\/$/, '');
+  if (configuredPublicUrl?.startsWith('http')) return configuredPublicUrl.replace(/\/$/, '');
+  const origin = process.env.API_ORIGIN ?? 'https://jagalchi-api.justn.me';
+  return `${origin.replace(/\/$/, '')}/api`;
 })();
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -268,7 +266,7 @@ export async function getPublicProofProfile(publicId: string): Promise<PublicPro
   }
 
   const response = await fetch(
-    `${publicApiOrigin}/career/proof-profiles/${encodeURIComponent(publicId)}`,
+    `${publicApiBase}/career/proof-profiles/${encodeURIComponent(publicId)}`,
     {
       method: 'GET',
       headers: { Accept: 'application/json' },
