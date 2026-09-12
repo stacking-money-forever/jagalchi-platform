@@ -61,7 +61,10 @@ export async function generateMetadata({ params }: ProofProfilePageProps): Promi
   const { publicId } = await params;
   try {
     const { profile } = await loadPublicProfile(publicId);
-    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://jagalchi.dev').replace(/\/$/, '');
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://jagalchi.justn.me').replace(
+      /\/$/,
+      '',
+    );
     return {
       title: `${profile.displayName} — Proof Profile`,
       description: profile.summary ?? '검증된 실행 증거를 확인하세요.',

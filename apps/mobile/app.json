@@ -23,7 +23,8 @@
       "expo-secure-store",
       "expo-notifications",
       "expo-web-browser",
-      "expo-iap"
+      "expo-iap",
+      "expo-sharing"
     ]
   }
 }

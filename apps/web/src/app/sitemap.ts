@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next';
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://jagalchi.dev';
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://jagalchi.justn.me';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
