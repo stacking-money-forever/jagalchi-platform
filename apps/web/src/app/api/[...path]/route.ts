@@ -29,7 +29,7 @@ const API_ORIGIN = getApiOrigin();
  * 개발 환경에서는 localhost 3000 포트를 추가로 허용한다.
  */
 function buildAllowedOrigins(): Set<string> {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://jagalchi.dev';
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://jagalchi.justn.me';
   // trailing slash 제거 후 origin만 추출
   const normalized = siteUrl.replace(/\/$/, '');
   const origins = new Set([normalized]);

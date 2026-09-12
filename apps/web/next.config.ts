@@ -3,7 +3,7 @@ import { withSentryConfig } from '@sentry/nextjs';
 
 import type { NextConfig } from 'next';
 
-const API_ORIGIN = process.env.API_ORIGIN ?? 'https://api.jagalchi.dev';
+const API_ORIGIN = process.env.API_ORIGIN ?? 'https://jagalchi-api.justn.me';
 const CDN_ORIGIN = 'https://cdn.jagalchi.dev';
 const APPROVED_ANALYTICS_ORIGINS = new Set(['https://us.i.posthog.com']);
 

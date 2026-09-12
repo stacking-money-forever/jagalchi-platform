@@ -83,7 +83,7 @@ const publicApiOrigin = (() => {
   const origin =
     process.env.API_ORIGIN ??
     (configuredPublicUrl?.startsWith('http') ? configuredPublicUrl : undefined) ??
-    'https://api.jagalchi.dev';
+    'https://jagalchi-api.justn.me';
   return origin.replace(/\/$/, '');
 })();
 
