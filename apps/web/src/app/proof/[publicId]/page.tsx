@@ -1,5 +1,3 @@
-import { cache } from 'react';
-
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { connection } from 'next/server';
@@ -27,8 +25,6 @@ const CRITERION_LABELS: Record<PublicProofCriterionType, string> = {
   HUMAN_CHECK: '사람 검토',
 };
 
-const loadPublicProfile = cache(getPublicProofProfile);
-
 function safeDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '검증 완료';
@@ -42,7 +38,7 @@ function safeDate(value: string): string {
 
 async function loadOrNotFound(publicId: string) {
   try {
-    return await loadPublicProfile(publicId);
+    return await getPublicProofProfile(publicId);
   } catch (error) {
     if (error instanceof PublicProofProfileUnavailableError) notFound();
     throw new Error('공개 프로필을 불러오지 못했습니다.');
@@ -62,7 +58,7 @@ export async function generateMetadata({ params }: ProofProfilePageProps): Promi
   await connection();
   const { publicId } = await params;
   try {
-    const { profile } = await loadPublicProfile(publicId);
+    const { profile } = await getPublicProofProfile(publicId);
     const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://jagalchi.justn.me').replace(
       /\/$/,
       '',
