@@ -2,6 +2,7 @@ import { cache } from 'react';
 
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { connection } from 'next/server';
 
 import {
   getPublicProofProfile,
@@ -58,6 +59,7 @@ export async function generateMetadata({ params }: ProofProfilePageProps): Promi
     };
   }
 
+  await connection();
   const { publicId } = await params;
   try {
     const { profile } = await loadPublicProfile(publicId);
@@ -87,6 +89,7 @@ export async function generateMetadata({ params }: ProofProfilePageProps): Promi
 export default async function ProofProfilePage({ params }: ProofProfilePageProps) {
   if (!isEnabled('PROOF_PROFILE_ENABLED')) notFound();
 
+  await connection();
   const { publicId } = await params;
   const profile = await loadOrNotFound(publicId);
 
